@@ -1,6 +1,9 @@
 # Trainingsarchiv
 
 Persönliches Archiv der eigenen Freeletics-Trainings als installierbare Web-App (PWA).
+
+> **Inoffizielles Projekt.** Trainingsarchiv steht in keiner Verbindung zu Freeletics und wird von Freeletics weder angeboten noch unterstützt oder geprüft. „Freeletics“ ist eine Marke ihres Inhabers und wird hier nur verwendet, um zu beschreiben, welche Daten die App liest.
+
 Man lädt einmal den Freeletics-Datenexport, alles Weitere passiert lokal im Browser. Es gibt keinen Server und keine Konten.
 
 ## Starten

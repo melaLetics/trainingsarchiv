@@ -1,7 +1,7 @@
 {
   "name": "Trainingsarchiv",
   "short_name": "Trainingsarchiv",
-  "description": "Persönliches Archiv deiner Freeletics-Trainings: Serien, Bestzeiten, Übungen und Verlauf.",
+  "description": "Inoffizielles, privates Archiv für den eigenen Freeletics-Datenexport. Kein Produkt von Freeletics.",
   "lang": "de",
   "start_url": "./#overview",
   "scope": "./",

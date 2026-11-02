@@ -512,7 +512,8 @@ function route() {
   window.scrollTo(0, 0);
 }
 function welcome() {
-  return `<section class="sec welcome"><h1>Dein Freeletics-Archiv</h1>
+  return `<section class="sec welcome"><h1>Dein Trainingsarchiv</h1>
+    <p class="unoff"><b>Inoffiziell.</b> Diese App ist ein privates Projekt und kein Produkt von Freeletics. Sie liest nur den Datenexport, den du selbst bei Freeletics anforderst.</p>
     <p>Lade einmal deinen Freeletics-Datenexport, und du siehst alle Trainings seit deinem ersten Workout: Serien, Bestzeiten, Übungen und Verlauf. Die Daten bleiben auf diesem Gerät.</p>
     <ol class="steps"><li>Fordere bei Freeletics deinen Datenexport an. Du bekommst eine ZIP-Datei, deren Name mit <b>fl_uid_</b> beginnt.</li><li>Wähle oben genau diese ZIP-Datei aus. Entpacken ist nicht nötig.</li><li>Fertig. Beim nächsten Öffnen sind die Daten sofort da.</li></ol></section>`;
 }
