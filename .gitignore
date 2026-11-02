@@ -1,0 +1,7 @@
+# Persönliche Daten nie einchecken
+data/
+*.zip
+data.json
+text_data.yml
+dist/
+node_modules/

@@ -1,0 +1,10 @@
+{
+  "name": "trainingsarchiv",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Persönliches Archiv der eigenen Freeletics-Trainings als installierbare Web-App (PWA)",
+  "scripts": {
+    "start": "node tools/serve.mjs 8080",
+    "preview": "node tools/build-preview.mjs"
+  }
+}
