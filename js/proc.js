@@ -40,7 +40,7 @@
 
   function processExport(raw) {
     const T = (raw.training && raw.training.trainings) || [];
-    if (!T.length) throw new Error('In der Datei wurden keine Trainings gefunden.');
+    if (!T.length) throw Object.assign(new Error('In der Datei wurden keine Trainings gefunden.'), { code: 'notrainings' });
     const exIdx = new Map(), exNames = [];
     const ex = (n) => { if (!exIdx.has(n)) { exIdx.set(n, exNames.length); exNames.push(n); } return exIdx.get(n); };
 

@@ -2,17 +2,38 @@
 (function () {
 'use strict';
 const DAY = 86400000;
-const CAT = { kraft: 'Kraft & HIIT', mob: 'Mobility', lauf: 'Laufen', rad: 'Rad' };
 const CATS = ['kraft', 'mob', 'lauf', 'rad'];
-const TYPE = { structured: 'Mit Aufbau', reps: 'Nur Wiederholungen', distance: 'Distanz', free: 'Frei', none: 'Ohne Details' };
-const MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const nf = new Intl.NumberFormat('de-DE');
-const nf1 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+
+/* ---------- Sprache ---------- */
+const LANGS = window.I18N || { de: {} };
+let LANG = 'de';
+try { LANG = localStorage.getItem('ta-lang') || ''; } catch (e) {}
+if (!LANGS[LANG]) LANG = /^de\b/i.test(navigator.language || '') ? 'de' : 'en';
+if (!LANGS[LANG]) LANG = 'de';
+function t(key, ...a) {
+  let v = LANGS[LANG][key]; if (v === undefined) v = LANGS.de[key]; if (v === undefined) return key;
+  return typeof v === 'function' ? v(...a) : v;
+}
+let CAT, TYPE, MON, WD, WD_NAME, METRIC, nf, nf1, dateFmt;
+function applyLang() {
+  CAT = t('cat'); TYPE = t('type'); MON = t('mon'); WD = t('wd'); WD_NAME = t('wdName'); METRIC = t('metric');
+  const loc = LANG === 'de' ? 'de-DE' : 'en-GB';
+  nf = new Intl.NumberFormat(loc); nf1 = new Intl.NumberFormat(loc, { maximumFractionDigits: 1 });
+  dateFmt = LANG === 'de' ? null : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  document.documentElement.lang = LANG;
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+}
+applyLang();
+const exName = (n) => (n === 'Pause' ? t('pause') : n);
+const pctF = (r) => t('pct', nf1.format(r * 100));
+
 const dDate = (day) => new Date(day * DAY);
-const fDate = (day) => { const d = dDate(day); return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear(); };
+const fDate = (day) => { const d = dDate(day); if (dateFmt) return dateFmt.format(d); return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear(); };
 const yearOf = (day) => dDate(day).getUTCFullYear();
 const fTime = (s) => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 const fKm = (m) => (m >= 100000 ? nf.format(Math.round(m / 1000)) : nf1.format(m / 1000)) + ' km';
@@ -67,7 +88,6 @@ function defaultMetric(m, wi, ss) {
   if (reps.length) return 'reps';
   return 'pts';
 }
-const METRIC = { dur: 'Zeit', reps: 'Wiederholungen', dist: 'Distanz', pts: 'Punkte' };
 const fMetric = (metric, v) => metric === 'dur' ? fTime(v) : metric === 'dist' ? fKm(v) : nf.format(v);
 
 /* ---------- Tooltip ---------- */
@@ -100,60 +120,39 @@ function overview() {
   const st = streaks();
   const first = D.days[0], last = D.days[D.days.length - 1];
   const years = (last - first) / 365.25;
-  let html = `<section class="sec"><div class="dhead"><h1>${nf.format(n)} Trainings in ${nf1.format(years)} Jahren</h1>
-    <div class="note">Vom ${fDate(first)} bis ${fDate(last)} · ${nf.format(D.days.length)} Trainingstage · ${nf.format(M.w.length)} verschiedene Workouts</div></div>
+  let html = `<section class="sec"><div class="dhead"><h1>${t('ov.h1', nf.format(n), nf1.format(years))}</h1>
+    <div class="note">${t('ov.sub', fDate(first), fDate(last), nf.format(D.days.length), nf.format(M.w.length))}</div></div>
     <div class="stats">
-      ${stat('Trainingszeit', nf.format(Math.round(secs / 3600)) + '<small>h</small>', 'Ø ' + nf.format(Math.round(secs / 60 / n)) + ' min pro Einheit')}
-      ${stat('Wiederholungen', nf.format(reps), 'laut Gesamtwertung je Einheit')}
-      ${stat('Punkte', nf.format(pts), nf.format(Math.round(pts / D.days.length)) + ' pro Trainingstag')}
-      ${stat('Gelaufen', unit(fKm(run)), 'Free runs, Distance runs')}
-      ${stat('Geradelt', unit(fKm(ride)), 'Indoor und outdoor')}
-      ${stat('Sterne', nf.format(stars), nf.format(pbs) + '× persönliche Bestleistung')}
+      ${stat(t('st.time'), nf.format(Math.round(secs / 3600)) + '<small>h</small>', t('st.timeSub', nf.format(Math.round(secs / 60 / n))))}
+      ${stat(t('st.reps'), nf.format(reps), t('st.repsSub'))}
+      ${stat(t('st.pts'), nf.format(pts), t('st.ptsSub', nf.format(Math.round(pts / D.days.length))))}
+      ${stat(t('st.run'), unit(fKm(run)), t('st.runSub'))}
+      ${stat(t('st.ride'), unit(fKm(ride)), t('st.rideSub'))}
+      ${stat(t('st.stars'), nf.format(stars), t('st.starsSub', nf.format(pbs)))}
     </div>
     <div class="stats wide">
-      ${stat('Längste Serie', st.best + ' Tage', 'ab ' + fDate(st.bestFrom))}
-      ${stat('Aktuelle Serie', st.current + (st.current === 1 ? ' Tag' : ' Tage'), st.current ? 'seit ' + fDate(st.curFrom) : 'letztes Training ' + fDate(st.last))}
-      ${stat('Längste Pause', st.gap + ' Tage', 'nach dem ' + fDate(st.gapFrom))}
+      ${stat(t('st.longest'), t('days', st.best, nf.format(st.best)), t('st.from', fDate(st.bestFrom)))}
+      ${stat(t('st.current'), t('days', st.current, nf.format(st.current)), st.current ? t('st.since', fDate(st.curFrom)) : t('st.lastTraining', fDate(st.last)))}
+      ${stat(t('st.gap'), t('days', st.gap, nf.format(st.gap)), t('st.after', fDate(st.gapFrom)))}
     </div></section>`;
-  html += `<section class="sec"><div class="sechead"><h2>Jeder Trainingstag</h2>
-      <div class="legend">weniger <span class="sw" style="background:var(--heat0)"></span><span class="sw" style="background:color-mix(in srgb,var(--accent) 30%,var(--heat0))"></span><span class="sw" style="background:color-mix(in srgb,var(--accent) 55%,var(--heat0))"></span><span class="sw" style="background:color-mix(in srgb,var(--accent) 80%,var(--heat0))"></span><span class="sw" style="background:var(--accent)"></span> mehr Trainingszeit</div></div>
-      <div class="panel scroll" id="heat">${heatmap()}</div></section>`;
   html += `<section class="grid2">
-      <div class="panel sec"><div class="sechead"><h2>Pro Jahr</h2><div class="seg" role="group" aria-label="Einheit"><button type="button" data-ym="n" aria-pressed="${yearMode === 'n'}">Einheiten</button><button type="button" data-ym="h" aria-pressed="${yearMode === 'h'}">Stunden</button></div></div>
+      <div class="panel sec"><div class="sechead"><h2>${t('ov.perYear')}</h2><div class="seg" role="group" aria-label="${t('ov.unit')}"><button type="button" data-ym="n" aria-pressed="${yearMode === 'n'}">${t('ov.sessions')}</button><button type="button" data-ym="h" aria-pressed="${yearMode === 'h'}">${t('ov.hours')}</button></div></div>
         <div id="yearChart">${yearChart()}</div>
         <div class="legend">${CATS.map((c) => `<span><span class="sw c-${c}"></span>${CAT[c]}</span>`).join('')}</div>
-        <div class="note">Die Zuordnung zu Kraft, Mobility, Laufen und Rad ist aus den Workout-Namen geschätzt.</div></div>
-      <div class="panel sec"><h2>Vor genau einem Jahr</h2>${onThisDay()}</div>
+        <div class="note">${t('ov.catNote')}</div></div>
+      <div class="panel sec"><h2>${t('ov.onThisDay')}</h2>${onThisDay()}</div>
     </section>`;
   html += `<section class="grid2">
-      <div class="panel sec"><h2>Häufigste Workouts</h2><div class="list">${topWorkouts()}</div></div>
-      <div class="panel sec"><h2>Meiste Wiederholungen</h2>${topExercises()}<div class="note">Summe über alle Einheiten mit Rundendaten (ab ${D.ex.minY}). <a href="#exercises">Alle Übungen</a></div></div>
+      <div class="panel sec"><h2>${t('ov.topW')}</h2><div class="list">${topWorkouts()}</div></div>
+      <div class="panel sec"><h2>${t('ov.topX')}</h2>${topExercises()}<div class="note">${t('ov.topXNote', D.ex.minY)} <a href="#exercises">${t('ov.allX')}</a></div></div>
     </section>`;
-  html += `<section class="grid2"><div class="panel sec"><h2>Wochentage</h2>${rhythm('wd')}</div><div class="panel sec"><h2>Uhrzeit</h2>${rhythm('hour')}</div></section>`;
+  html += `<section class="panel sec" id="pbwhen">${pbWhen()}</section>`;
+  html += `<section class="grid2"><div class="panel sec"><h2>${t('ov.weekdays')}</h2>${rhythm('wd')}</div><div class="panel sec"><h2>${t('ov.hourOfDay')}</h2>${rhythm('hour')}</div></section>`;
   return html;
 }
 const unit = (s) => s.replace(/ (km|h)$/, '<small>$1</small>');
 function stat(l, v, s) { return `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`; }
 
-function heatmap() {
-  const y0 = yearOf(D.days[0]), y1 = yearOf(D.days[D.days.length - 1]);
-  const cw = 2.6, ch = 13, gap = 4, left = 40, top = 16;
-  const W = left + 366 * cw + 4, H = top + (y1 - y0 + 1) * (ch + gap);
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:900px;display:block" role="img" aria-label="Kalender aller Trainingstage, ein Streifen pro Jahr">`;
-  MON.forEach((mn, i) => { const x = left + Math.round(Date.UTC(2001, i, 1) / DAY - Date.UTC(2001, 0, 1) / DAY) * cw; s += `<text x="${x}" y="10">${mn}</text>`; });
-  for (let y = y0; y <= y1; y++) {
-    const yy = top + (y - y0) * (ch + gap);
-    const start = Math.round(Date.UTC(y, 0, 1) / DAY), end = Math.round(Date.UTC(y + 1, 0, 1) / DAY);
-    s += `<text x="0" y="${yy + 10}" style="font-weight:600">${y}</text><rect class="h0" x="${left}" y="${yy}" width="${(end - start) * cw}" height="${ch}" rx="2"/>`;
-    for (let d = start; d < end; d++) {
-      const ss = D.dayMap.get(d); if (!ss) continue;
-      const min = ss.reduce((a, i) => a + M.s.dur[i], 0) / 60;
-      const lv = min < 15 ? 1 : min < 35 ? 2 : min < 70 ? 3 : 4;
-      s += `<rect class="h${lv}" data-d="${d}" x="${left + (d - start) * cw}" y="${yy}" width="${cw}" height="${ch}"/>`;
-    }
-  }
-  return s + '</svg>';
-}
 function yearChart() {
   const y0 = yearOf(D.days[0]), y1 = yearOf(D.days[D.days.length - 1]);
   const rows = [];
@@ -163,7 +162,7 @@ function yearChart() {
   const max = Math.max(...rows.map((r) => CATS.reduce((a, c) => a + r.v[c], 0)));
   const ticks = niceTicks(0, max, 4), tmax = ticks[ticks.length - 1];
   const W = 460, H = 220, L = 38, B = 22, T = 8, bw = (W - L) / rows.length;
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Trainings pro Jahr nach Art">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${t('ov.yearAria')}">`;
   ticks.forEach((t) => { const y = T + (H - B - T) * (1 - t / tmax); s += `<line class="axis" x1="${L}" x2="${W}" y1="${y}" y2="${y}"/><text x="${L - 6}" y="${y + 4}" text-anchor="end">${nf.format(t)}</text>`; });
   rows.forEach((r, i) => {
     let acc = 0; const x = L + i * bw + bw * 0.15;
@@ -174,25 +173,25 @@ function yearChart() {
   return s + '</svg>';
 }
 function onThisDay() {
-  const t = todayDay(); const d0 = dDate(t); const target = Math.round(Date.UTC(d0.getUTCFullYear() - 1, d0.getUTCMonth(), d0.getUTCDate()) / DAY);
+  const td = todayDay(); const d0 = dDate(td); const target = Math.round(Date.UTC(d0.getUTCFullYear() - 1, d0.getUTCMonth(), d0.getUTCDate()) / DAY);
   let out = `<div class="note">${fDate(target)}</div>`;
   const ss = D.dayMap.get(target);
   if (ss) out += `<div class="list">${ss.map((i) => sessRow(i)).join('')}</div>`;
   else {
     let near = null; for (const d of D.days) { if (d <= target) near = d; else break; }
-    out += `<div class="empty">An diesem Tag hast du nicht trainiert.${near ? ` Das Training davor war am ${fDate(near)}:` : ''}</div>`;
+    out += `<div class="empty">${t('otd.none')}${near ? t('otd.before', fDate(near)) : ''}</div>`;
     if (near) out += `<div class="list">${D.dayMap.get(near).map((i) => sessRow(i)).join('')}</div>`;
   }
   // Durch die Jahre
   const years = [];
   for (let k = 2; k <= 12; k++) { const dd = Math.round(Date.UTC(d0.getUTCFullYear() - k, d0.getUTCMonth(), d0.getUTCDate()) / DAY); if (D.dayMap.get(dd)) years.push(dd); }
-  if (years.length) out += `<div class="note">Am gleichen Tag hast du auch trainiert: ${years.map((d) => yearOf(d)).join(', ')}.</div>`;
+  if (years.length) out += `<div class="note">${t('otd.years', years.map((d) => yearOf(d)).join(', '))}</div>`;
   return out;
 }
 function sessRow(i) {
   const S = M.s, wi = S.w[i], w = M.w[wi], m = D.wInfo[wi].metric;
   const v = m ? mv(M, i, m) : 0;
-  return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span> ${S.f[i] & 2 ? '<span class="tag pbtag">Bestleistung</span>' : ''}<div class="meta">${S.pts[i]} Punkte</div></span><span class="rt">${v ? '<b>' + fMetric(m, v) + '</b>' : ''}</span></a>`;
+  return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span> ${S.f[i] & 2 ? `<span class="tag pbtag">${t('tag.pb')}</span>` : ''}<div class="meta">${t('points', nf.format(S.pts[i]))}</div></span><span class="rt">${v ? '<b>' + fMetric(m, v) + '</b>' : ''}</span></a>`;
 }
 function topWorkouts() {
   const idx = M.w.map((_, i) => i).sort((a, b) => D.wInfo[b].count - D.wInfo[a].count).slice(0, 8);
@@ -202,14 +201,58 @@ function topWorkouts() {
 function topExercises() {
   const idx = M.ex.map((_, i) => i).filter((i) => M.exTot[i][0] > 0 && M.ex[i] !== 'Pause').sort((a, b) => M.exTot[b][0] - M.exTot[a][0]).slice(0, 10);
   const max = M.exTot[idx[0]][0];
-  return `<div style="display:grid;gap:6px">${idx.map((i) => `<a class="exbar" href="#exercise-${i}"><span style="overflow-wrap:anywhere">${esc(M.ex[i])}</span><span class="num" style="font-weight:600;font-size:16px">${nf.format(M.exTot[i][0])}</span><span style="grid-column:1/-1;height:6px;border-radius:3px;background:var(--sunk)"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);width:${(M.exTot[i][0] / max * 100).toFixed(1)}%"></span></span></a>`).join('')}</div>`;
+  return `<div style="display:grid;gap:6px">${idx.map((i) => `<a class="exbar" href="#exercise-${i}"><span style="overflow-wrap:anywhere">${esc(exName(M.ex[i]))}</span><span class="num" style="font-weight:600;font-size:16px">${nf.format(M.exTot[i][0])}</span><span style="grid-column:1/-1;height:6px;border-radius:3px;background:var(--sunk)"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);width:${(M.exTot[i][0] / max * 100).toFixed(1)}%"></span></span></a>`).join('')}</div>`;
+}
+/* Wann gelingen Bestleistungen? Anteil der Trainings mit Bestleistung je Wochentag und Zeitfenster */
+const PB_WIN = [[0, 9], [9, 12], [12, 15], [15, 18], [18, 21], [21, 24]];
+function pbWhen() {
+  const S = M.s, n = S.w.length;
+  let first = Infinity;
+  for (let i = 0; i < n; i++) if (S.f[i] & 2) { first = S.day[i]; break; }
+  const head = `<div class="sechead"><h2>${t('pb.h')}</h2></div>`;
+  if (first === Infinity) return head + `<div class="empty">${t('pb.none')}</div>`;
+  const WL = t('pb.win');
+  const cell = Array.from({ length: 7 }, () => PB_WIN.map(() => [0, 0]));
+  const wd = Array.from({ length: 7 }, () => [0, 0]), win = PB_WIN.map(() => [0, 0]);
+  let tot = 0, pbs = 0;
+  for (let i = 0; i < n; i++) {
+    if (S.day[i] < first) continue;
+    const w = M.w[S.w[i]]; if (w.c === 'mob' || w.t === 'free') continue;
+    const d = (dDate(S.day[i]).getUTCDay() + 6) % 7, h = S.hour[i], k = PB_WIN.findIndex((x) => h >= x[0] && h < x[1]);
+    const pb = S.f[i] & 2 ? 1 : 0;
+    cell[d][k][0]++; cell[d][k][1] += pb; wd[d][0]++; wd[d][1] += pb; win[k][0]++; win[k][1] += pb; tot++; pbs += pb;
+  }
+  const avg = pbs / tot, MIN = Math.max(40, Math.round(tot * 0.01));
+  const rate = (x) => (x[0] >= MIN ? x[1] / x[0] : -1);
+  let best = null;
+  cell.forEach((r, d) => r.forEach((x, k) => { if (rate(x) > (best ? rate(cell[best[0]][best[1]]) : -1)) best = [d, k]; }));
+  const bestWd = wd.reduce((a, x, i) => (rate(x) > rate(wd[a]) ? i : a), 0);
+  const bestWin = win.reduce((a, x, i) => (rate(x) > rate(win[a]) ? i : a), 0);
+  const pct = pctF;
+  const winText = (k) => t('pb.winText', k, PB_WIN[k][0], PB_WIN[k][1], PB_WIN.length - 1);
+  const bx = cell[best[0]][best[1]], br = bx[1] / bx[0];
+  const maxR = Math.max(...cell.flat().map(rate));
+  let h = head + `<p class="pbanswer">${t('pb.answer', t('pb.when', best[0], winText(best[1])), Math.round(1 / br), pct(br), Math.round(1 / avg), pct(avg))}</p>
+    <div class="pbfacts"><span>${t('pb.bestWd')}: <b>${WD_NAME[bestWd]}</b> (${pct(wd[bestWd][1] / wd[bestWd][0])})</span><span>${t('pb.bestWin')}: <b>${t('pb.winLabel', WL[bestWin])}</b> (${pct(win[bestWin][1] / win[bestWin][0])})</span></div>
+    <div class="scroll"><table class="pbgrid"><thead><tr><th></th>${WL.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>`;
+  cell.forEach((r, d) => {
+    h += `<tr><th>${WD[d]}</th>${r.map((x, k) => {
+      const tip = t('pb.cellTip', WD_NAME[d], WL[k], x[1], nf.format(x[0]));
+      if (x[0] < MIN) return `<td class="few" title="${tip}${t('pb.few')}">${x[0] ? '·' : ''}</td>`;
+      const r1 = x[1] / x[0], mix = Math.round(8 + 87 * r1 / maxR);
+      const isBest = d === best[0] && k === best[1];
+      return `<td title="${tip}" style="background:color-mix(in srgb,var(--pb) ${mix}%,var(--surface));${mix > 55 ? 'color:var(--pb-fg);' : ''}"${isBest ? ' class="best"' : ''}>${nf1.format(r1 * 100)}</td>`;
+    }).join('')}</tr>`;
+  });
+  h += `</tbody></table></div><div class="note">${t('pb.note', fDate(first), nf.format(tot), MIN)}</div>`;
+  return h;
 }
 function rhythm(kind) {
   const S = M.s, n = kind === 'wd' ? 7 : 24, v = new Array(n).fill(0);
   for (let i = 0; i < S.w.length; i++) { if (kind === 'wd') v[(dDate(S.day[i]).getUTCDay() + 6) % 7]++; else v[S.hour[i]]++; }
   const max = Math.max(...v), W = 460, H = 140, B = 18, bw = W / n;
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Trainings nach ${kind === 'wd' ? 'Wochentag' : 'Uhrzeit'}">`;
-  v.forEach((x, i) => { const h = (H - B - 4) * x / max; s += `<rect x="${i * bw + bw * 0.12}" y="${H - B - h}" width="${bw * 0.76}" height="${h}" rx="2" style="fill:var(--accent)"><title>${kind === 'wd' ? WD[i] : i + ' Uhr'}: ${nf.format(x)} Trainings</title></rect>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${t('rh.aria', kind === 'wd')}">`;
+  v.forEach((x, i) => { const h = (H - B - 4) * x / max; s += `<rect x="${i * bw + bw * 0.12}" y="${H - B - h}" width="${bw * 0.76}" height="${h}" rx="2" style="fill:var(--accent)"><title>${t('rh.title', kind === 'wd' ? WD_NAME[i] : t('rh.hour', i), nf.format(x))}</title></rect>`;
     if (kind === 'wd' || i % 3 === 0) s += `<text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${kind === 'wd' ? WD[i] : i}</text>`; });
   return s + '</svg>';
 }
@@ -230,11 +273,11 @@ function timeTicks(lo, hi, n) {
 /* ---------- Workout-Liste ---------- */
 const LS = { q: '', types: { structured: true, reps: true, distance: true, free: true, none: false }, cat: '', sort: 'count', limit: 150 };
 function workoutsView() {
-  return `<section class="sec"><div class="dhead"><h1>Workouts</h1><div class="note">Aus deinen Trainings abgeleitet: Aufbau, Häufigkeit und Bestwert je Workout.</div></div>
-    <div class="tools"><input type="search" id="q" placeholder="Workout oder Übung suchen" value="${esc(LS.q)}" aria-label="Suchen">
-      <select id="sort" aria-label="Sortierung"><option value="count">Am häufigsten</option><option value="last">Zuletzt gemacht</option><option value="name">Name A–Z</option></select></div>
+  return `<section class="sec"><div class="dhead"><h1>${t('nav.workouts')}</h1><div class="note">${t('w.sub')}</div></div>
+    <div class="tools"><input type="search" id="q" placeholder="${t('w.search')}" value="${esc(LS.q)}" aria-label="${t('search.aria')}">
+      <select id="sort" aria-label="${t('sort.aria')}"><option value="count">${t('sort.count')}</option><option value="last">${t('sort.last')}</option><option value="name">${t('sort.name')}</option></select></div>
     <div class="tools" id="typeChips">${Object.keys(TYPE).map((t) => `<button type="button" class="chip" data-type="${t}" aria-pressed="${LS.types[t]}">${TYPE[t]}</button>`).join('')}</div>
-    <div class="tools" id="catChips"><button type="button" class="chip" data-cat="" aria-pressed="${LS.cat === ''}">Alle Arten</button>${CATS.map((c) => `<button type="button" class="chip" data-cat="${c}" aria-pressed="${LS.cat === c}"><span class="sw c-${c}"></span>${CAT[c]}</button>`).join('')}</div>
+    <div class="tools" id="catChips"><button type="button" class="chip" data-cat="" aria-pressed="${LS.cat === ''}">${t('w.allCats')}</button>${CATS.map((c) => `<button type="button" class="chip" data-cat="${c}" aria-pressed="${LS.cat === c}"><span class="sw c-${c}"></span>${CAT[c]}</button>`).join('')}</div>
     <div class="note" id="count"></div><div class="list" id="wlist"></div><div id="more"></div></section>`;
 }
 function filteredWorkouts() {
@@ -245,16 +288,16 @@ function filteredWorkouts() {
   const I = D.wInfo;
   if (LS.sort === 'count') idx.sort((a, b) => I[b].count - I[a].count);
   else if (LS.sort === 'last') idx.sort((a, b) => I[b].last - I[a].last);
-  else idx.sort((a, b) => M.w[a].n.localeCompare(M.w[b].n, 'de'));
+  else idx.sort((a, b) => M.w[a].n.localeCompare(M.w[b].n, LANG));
   return idx;
 }
 function renderList() {
   const idx = filteredWorkouts();
-  $('count').textContent = nf.format(idx.length) + ' Workouts';
+  $('count').textContent = t('w.count', nf.format(idx.length));
   $('wlist').innerHTML = idx.slice(0, LS.limit).map((wi) => { const w = M.w[wi], inf = D.wInfo[wi];
-    const best = inf.best && w.c !== 'mob' ? `<b>${fMetric(inf.metric, inf.best)}</b><div class="meta">${inf.metric === 'dist' ? 'Längste' : 'Bestwert'}</div>` : '';
-    return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span><div class="meta">${nf.format(inf.count)}× · zuletzt ${fDate(inf.last)}${w.t === 'structured' ? ' · ' + w.r.length + (w.r.length === 1 ? ' Runde' : ' Runden') : ''}${w.tot ? ' · ' + nf.format(w.tot) + ' Wdh.' : ''}</div></span><span class="rt">${best}</span></a>`; }).join('') || '<div class="empty">Kein Workout passt zu Suche und Filter.</div>';
-  $('more').innerHTML = idx.length > LS.limit ? `<button type="button" class="btn" id="btnMore">${nf.format(Math.min(150, idx.length - LS.limit))} weitere anzeigen</button>` : '';
+    const best = inf.best && w.c !== 'mob' ? `<b>${fMetric(inf.metric, inf.best)}</b><div class="meta">${inf.metric === 'dist' ? t('w.longest') : t('w.best')}</div>` : '';
+    return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span><div class="meta">${nf.format(inf.count)}× · ${t('w.last', fDate(inf.last))}${w.t === 'structured' ? ' · ' + t('rounds', w.r.length) : ''}${w.tot ? ' · ' + t('repsShort', nf.format(w.tot)) : ''}</div></span><span class="rt">${best}</span></a>`; }).join('') || `<div class="empty">${t('w.empty')}</div>`;
+  $('more').innerHTML = idx.length > LS.limit ? `<button type="button" class="btn" id="btnMore">${t('more', nf.format(Math.min(150, idx.length - LS.limit)))}</button>` : '';
 }
 
 /* ---------- Workout-Detail ---------- */
@@ -269,13 +312,13 @@ function qty(e) {
 function detailView(wi) {
   if (wi !== detailWi) { detailMetric = null; detailWi = wi; }
   const w = M.w[wi], inf = D.wInfo[wi], ss = D.wSess[wi], S = M.s;
-  if (!w) return `<div class="empty">Dieses Workout gibt es in den geladenen Daten nicht. <a href="#workouts">Zur Liste</a></div>`;
+  if (!w) return `<div class="empty">${t('d.missing')} <a href="#workouts">${t('toList')}</a></div>`;
   const metrics = ['dur', 'reps', 'dist', 'pts'].filter((m) => ss.some((i) => mv(M, i, m) > 0));
   if (!detailMetric || !metrics.includes(detailMetric)) detailMetric = inf.metric && metrics.includes(inf.metric) ? inf.metric : metrics[0];
   const m = detailMetric;
-  let html = `<section class="sec"><a class="back" href="#workouts">← Alle Workouts</a>
+  let html = `<section class="sec"><a class="back" href="#workouts">${t('d.back')}</a>
     <div class="dhead"><div><span class="tag"><span class="sw c-${w.c}"></span>${CAT[w.c]}</span> <span class="tag">${TYPE[w.t]}</span></div><h1>${esc(w.n)}</h1>
-    <div class="note">${nf.format(inf.count)}× gemacht · erstmals ${fDate(inf.first)} · zuletzt ${fDate(inf.last)}</div></div>`;
+    <div class="note">${t('d.meta', nf.format(inf.count), fDate(inf.first), fDate(inf.last))}</div></div>`;
   if (m) {
     const vals = ss.map((i) => [i, mv(M, i, m)]).filter((x) => x[1] > 0);
     const lower = m === 'dur';
@@ -283,30 +326,30 @@ function detailView(wi) {
     const firstE = vals[0], lastE = vals[vals.length - 1];
     const recent = vals.slice(-10); const avg = recent.reduce((a, b) => a + b[1], 0) / recent.length;
     html += `<div class="stats">
-      ${stat('Bestwert', fMetric(m, bestE[1]), 'am ' + fDate(S.day[bestE[0]]))}
-      ${stat('Erstes Mal', fMetric(m, firstE[1]), fDate(S.day[firstE[0]]))}
-      ${stat('Letztes Mal', fMetric(m, lastE[1]), fDate(S.day[lastE[0]]))}
-      ${stat('Ø letzte ' + recent.length, fMetric(m, avg), 'Durchschnitt')}
+      ${stat(t('d.best'), fMetric(m, bestE[1]), t('d.on', fDate(S.day[bestE[0]])))}
+      ${stat(t('d.first'), fMetric(m, firstE[1]), fDate(S.day[firstE[0]]))}
+      ${stat(t('d.last'), fMetric(m, lastE[1]), fDate(S.day[lastE[0]]))}
+      ${stat(t('d.avgN', recent.length), fMetric(m, avg), t('d.avg'))}
     </div>`;
   }
   html += `</section>`;
-  if (m) html += `<section class="panel sec"><div class="sechead"><h2>Verlauf</h2>${metrics.length > 1 ? `<div class="seg" role="group" aria-label="Messgröße">${metrics.map((x) => `<button type="button" data-metric="${x}" aria-pressed="${x === m}">${METRIC[x]}</button>`).join('')}</div>` : ''}</div>
+  if (m) html += `<section class="panel sec"><div class="sechead"><h2>${t('d.progress')}</h2>${metrics.length > 1 ? `<div class="seg" role="group" aria-label="${t('d.metricAria')}">${metrics.map((x) => `<button type="button" data-metric="${x}" aria-pressed="${x === m}">${METRIC[x]}</button>`).join('')}</div>` : ''}</div>
       ${progressChart(wi, m)}
-      <div class="legend"><span><span class="sw" style="background:var(--accent);border-radius:50%"></span>Durchführung</span><span><span class="sw" style="background:var(--pb);border-radius:50%"></span>neuer Bestwert</span><span><span class="sw" style="background:var(--pb);height:2px"></span>Bestwert bis dahin</span></div></section>`;
+      <div class="legend"><span><span class="sw" style="background:var(--accent);border-radius:50%"></span>${t('leg.session')}</span><span><span class="sw" style="background:var(--pb);border-radius:50%"></span>${t('leg.newBest')}</span><span><span class="sw" style="background:var(--pb);height:2px"></span>${t('leg.bestSoFar')}</span></div></section>`;
   if (w.r) {
-    html += `<section class="sec"><div class="sechead"><h2>Aufbau</h2><span class="note">${w.r.length} ${w.r.length === 1 ? 'Runde' : 'Runden'}${w.tot ? ' · ' + nf.format(w.tot) + ' Wiederholungen' : ''}${w.sv > 1 ? ' · häufigste von ' + w.sv + ' Varianten' : ''}</span></div>
-      <div class="rounds">${w.r.map((r, ri) => `<div class="round"><h3>Runde ${ri + 1}</h3><ol>${r.map((e) => `<li class="${M.ex[e[0]] === 'Pause' ? 'pause' : ''}"><span class="q">${qty(e)}</span><span>${M.ex[e[0]] === 'Pause' ? 'Pause' : `<a class="exlink" href="#exercise-${e[0]}">${esc(M.ex[e[0]])}</a>`}${e[3] ? ' <span class="note">(' + esc(e[3]) + ')</span>' : ''}</span></li>`).join('')}</ol></div>`).join('')}</div></section>`;
+    html += `<section class="sec"><div class="sechead"><h2>${t('d.structure')}</h2><span class="note">${t('rounds', w.r.length)}${w.tot ? ' · ' + t('d.totalReps', nf.format(w.tot)) : ''}${w.sv > 1 ? ' · ' + t('d.variants', w.sv) : ''}</span></div>
+      <div class="rounds">${w.r.map((r, ri) => `<div class="round"><h3>${t('d.round', ri + 1)}</h3><ol>${r.map((e) => `<li class="${M.ex[e[0]] === 'Pause' ? 'pause' : ''}"><span class="q">${qty(e)}</span><span>${M.ex[e[0]] === 'Pause' ? t('pause') : `<a class="exlink" href="#exercise-${e[0]}">${esc(M.ex[e[0]])}</a>`}${e[3] ? ' <span class="note">(' + esc(e[3]) + ')</span>' : ''}</span></li>`).join('')}</ol></div>`).join('')}</div></section>`;
     const split = splitsChart(wi);
-    if (split) html += `<section class="panel sec"><h2>Rundenzeiten</h2>${split}</section>`;
+    if (split) html += `<section class="panel sec"><h2>${t('d.splits')}</h2>${split}</section>`;
   }
-  html += `<section class="panel sec"><h2>Letzte Durchführungen</h2><div class="scroll"><table><thead><tr><th>Datum</th><th class="r">Zeit</th><th class="r">Wdh.</th><th class="r">Distanz</th><th class="r">Punkte</th><th></th></tr></thead><tbody>
-    ${ss.slice(-15).reverse().map((i) => `<tr><td>${fDate(S.day[i])}</td><td class="r">${S.dur[i] ? fTime(S.dur[i]) : '–'}</td><td class="r">${S.reps[i] ? nf.format(S.reps[i]) : '–'}</td><td class="r">${S.dist[i] ? fKm(S.dist[i]) : '–'}</td><td class="r">${nf.format(S.pts[i])}</td><td>${S.f[i] & 2 ? '<span class="tag pbtag">Bestleistung</span>' : S.f[i] & 1 ? '<span class="tag">Stern</span>' : ''}</td></tr>`).join('')}
+  html += `<section class="panel sec"><h2>${t('d.recent')}</h2><div class="scroll"><table><thead><tr><th>${t('th.date')}</th><th class="r">${t('th.time')}</th><th class="r">${t('th.reps')}</th><th class="r">${t('th.dist')}</th><th class="r">${t('th.pts')}</th><th></th></tr></thead><tbody>
+    ${ss.slice(-15).reverse().map((i) => `<tr><td>${fDate(S.day[i])}</td><td class="r">${S.dur[i] ? fTime(S.dur[i]) : '–'}</td><td class="r">${S.reps[i] ? nf.format(S.reps[i]) : '–'}</td><td class="r">${S.dist[i] ? fKm(S.dist[i]) : '–'}</td><td class="r">${nf.format(S.pts[i])}</td><td>${S.f[i] & 2 ? `<span class="tag pbtag">${t('tag.pb')}</span>` : S.f[i] & 1 ? `<span class="tag">${t('tag.star')}</span>` : ''}</td></tr>`).join('')}
     </tbody></table></div></section>`;
   return html;
 }
 function progressChart(wi, m) {
   const S = M.s, ss = D.wSess[wi].filter((i) => mv(M, i, m) > 0);
-  if (ss.length < 2) return `<div class="empty">Für einen Verlauf braucht es mindestens zwei Durchführungen mit ${METRIC[m]}.</div>`;
+  if (ss.length < 2) return `<div class="empty">${t('pc.few', METRIC[m])}</div>`;
   const lower = m === 'dur';
   const xs = ss.map((i) => S.day[i]), ys = ss.map((i) => mv(M, i, m));
   let x0 = Math.min(...xs), x1 = Math.max(...xs); if (x1 - x0 < 30) { x0 -= 15; x1 += 15; }
@@ -315,7 +358,7 @@ function progressChart(wi, m) {
   const t0 = ticks[0], t1 = ticks[ticks.length - 1];
   const W = 900, H = 300, L = 56, R = 12, T = 12, B = 26;
   const X = (d) => L + (W - L - R) * (d - x0) / (x1 - x0), Y = (v) => T + (H - T - B) * (1 - (v - t0) / (t1 - t0));
-  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="Verlauf ${METRIC[m]}">`;
+  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="${t('pc.aria', METRIC[m])}">`;
   ticks.forEach((t) => s += `<line class="axis" x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${L - 8}" y="${Y(t) + 4}" text-anchor="end">${fMetric(m, t).replace(' km', '')}</text>`);
   const ya = yearOf(x0), yb = yearOf(x1), stepY = Math.max(1, Math.ceil((yb - ya + 1) / 12));
   for (let y = ya; y <= yb + 1; y += stepY) { const d = Math.round(Date.UTC(y, 0, 1) / DAY); if (d < x0 || d > x1) continue; s += `<line class="axis" x1="${X(d)}" x2="${X(d)}" y1="${T}" y2="${H - B}" stroke-dasharray="2 3"/><text x="${X(d) + 3}" y="${H - 8}">${y}</text>`; }
@@ -327,9 +370,9 @@ function progressChart(wi, m) {
   s += `<path d="${path}" fill="none" style="stroke:var(--pb)" stroke-width="2" opacity=".8"/>`;
   const recSet = new Set(recs);
   ss.forEach((i, k) => { if (!recSet.has(k)) s += `<circle cx="${X(xs[k]).toFixed(1)}" cy="${Y(ys[k]).toFixed(1)}" r="3.2" style="fill:var(--accent)" opacity=".55"><title>${fDate(xs[k])}: ${fMetric(m, ys[k])}</title></circle>`; });
-  recs.forEach((k) => s += `<circle cx="${X(xs[k]).toFixed(1)}" cy="${Y(ys[k]).toFixed(1)}" r="5" style="fill:var(--pb);stroke:var(--surface)" stroke-width="1.5"><title>Neuer Bestwert ${fDate(xs[k])}: ${fMetric(m, ys[k])}</title></circle>`);
+  recs.forEach((k) => s += `<circle cx="${X(xs[k]).toFixed(1)}" cy="${Y(ys[k]).toFixed(1)}" r="5" style="fill:var(--pb);stroke:var(--surface)" stroke-width="1.5"><title>${t('pc.newBest', fDate(xs[k]))}: ${fMetric(m, ys[k])}</title></circle>`);
   s += '</svg></div>';
-  s += `<div class="note">${recs.length} ${recs.length === 1 ? 'Bestwert' : 'Bestwerte'} über die Zeit${lower ? ' · weniger ist besser' : ''}.</div>`;
+  s += `<div class="note">${t('pc.note', recs.length, lower)}</div>`;
   return s;
 }
 function splitsChart(wi) {
@@ -340,12 +383,12 @@ function splitsChart(wi) {
   const best = ss.reduce((a, b) => S.dur[b] < S.dur[a] ? b : a);
   const last = ss[ss.length - 1];
   const avg = new Array(nR).fill(0); ss.forEach((i) => S.rt[i].forEach((t, k) => avg[k] += t / ss.length));
-  const series = [['Bestzeit ' + fDate(S.day[best]), S.rt[best], 'var(--pb)'], ['Zuletzt ' + fDate(S.day[last]), S.rt[last], 'var(--accent)'], ['Ø aller ' + ss.length, avg, 'var(--muted)']];
+  const series = [[t('sp.best', fDate(S.day[best])), S.rt[best], 'var(--pb)'], [t('sp.last', fDate(S.day[last])), S.rt[last], 'var(--accent)'], [t('sp.avg', ss.length), avg, 'var(--muted)']];
   if (best === last) series.splice(1, 1);
   const max = Math.max(...series.flatMap((x) => x[1]));
   let h = `<div class="legend">${series.map((x) => `<span><span class="sw" style="background:${x[2]}"></span>${x[0]}</span>`).join('')}</div><div style="display:grid;gap:10px">`;
   for (let k = 0; k < nR; k++) {
-    h += `<div style="display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;align-items:center"><span class="note">Runde ${k + 1}</span><div style="display:grid;gap:3px">${series.map((x) => `<div style="display:flex;align-items:center;gap:8px"><span style="height:9px;border-radius:2px;background:${x[2]};width:${(x[1][k] / max * 80).toFixed(1)}%"></span><span class="num" style="font-size:14px">${fTime(x[1][k])}</span></div>`).join('')}</div></div>`;
+    h += `<div style="display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;align-items:center"><span class="note">${t('d.round', k + 1)}</span><div style="display:grid;gap:3px">${series.map((x) => `<div style="display:flex;align-items:center;gap:8px"><span style="height:9px;border-radius:2px;background:${x[2]};width:${(x[1][k] / max * 80).toFixed(1)}%"></span><span class="num" style="font-size:14px">${fTime(x[1][k])}</span></div>`).join('')}</div></div>`;
   }
   return h + '</div>';
 }
@@ -362,9 +405,9 @@ function exInfo(m) {
   return { inW, minY };
 }
 function exercisesView() {
-  return `<section class="sec"><div class="dhead"><h1>Übungen</h1><div class="note">Alle Übungen aus den Runden deiner Trainings. Rundendaten liefert der Export ab ${D.ex.minY}, frühere Einheiten zählen hier nicht mit.</div></div>
-    <div class="tools"><input type="search" id="xq" placeholder="Übung suchen" value="${esc(XS.q)}" aria-label="Übung suchen">
-      <select id="xsort" aria-label="Sortierung"><option value="reps">Meiste Wiederholungen</option><option value="time">Meiste Zeit</option><option value="count">Am häufigsten</option><option value="name">Name A–Z</option></select></div>
+  return `<section class="sec"><div class="dhead"><h1>${t('x.h1')}</h1><div class="note">${t('x.sub', D.ex.minY)}</div></div>
+    <div class="tools"><input type="search" id="xq" placeholder="${t('x.search')}" value="${esc(XS.q)}" aria-label="${t('x.search')}">
+      <select id="xsort" aria-label="${t('sort.aria')}"><option value="reps">${t('xsort.reps')}</option><option value="time">${t('xsort.time')}</option><option value="count">${t('sort.count')}</option><option value="name">${t('sort.name')}</option></select></div>
     <div class="note" id="xcount"></div><div class="list" id="xlist"></div><div id="xmore"></div></section>`;
 }
 function renderExList() {
@@ -373,46 +416,46 @@ function renderExList() {
   if (XS.sort === 'reps') idx.sort((a, b) => T[b][0] - T[a][0] || T[b][1] - T[a][1]);
   else if (XS.sort === 'time') idx.sort((a, b) => T[b][1] - T[a][1]);
   else if (XS.sort === 'count') idx.sort((a, b) => T[b][2] - T[a][2]);
-  else idx.sort((a, b) => M.ex[a].localeCompare(M.ex[b], 'de'));
-  $('xcount').textContent = nf.format(idx.length) + ' Übungen';
+  else idx.sort((a, b) => M.ex[a].localeCompare(M.ex[b], LANG));
+  $('xcount').textContent = t('x.count', nf.format(idx.length));
   $('xlist').innerHTML = idx.slice(0, XS.limit).map((ei) => {
-    const t = T[ei], ys = Object.keys(M.exY[ei] || {}).map(Number);
-    const main = t[0] ? `<b>${nf.format(t[0])}</b><div class="meta">Wiederholungen</div>` : `<b>${fHours(t[1])}</b><div class="meta">Zeit</div>`;
-    return `<a class="row" href="#exercise-${ei}"><span class="dot" style="background:var(--accent)"></span><span><span class="nm">${esc(M.ex[ei])}</span><div class="meta">${nf.format(t[2])}× in Trainings · ${D.ex.inW[ei].length} Workouts${ys.length ? ' · ' + Math.min(...ys) + (Math.max(...ys) !== Math.min(...ys) ? '–' + Math.max(...ys) : '') : ''}</div></span><span class="rt">${main}</span></a>`;
-  }).join('') || '<div class="empty">Keine Übung passt zur Suche.</div>';
-  $('xmore').innerHTML = idx.length > XS.limit ? `<button type="button" class="btn" id="btnXMore">${nf.format(Math.min(150, idx.length - XS.limit))} weitere anzeigen</button>` : '';
+    const tt = T[ei], ys = Object.keys(M.exY[ei] || {}).map(Number);
+    const main = tt[0] ? `<b>${nf.format(tt[0])}</b><div class="meta">${t('x.reps')}</div>` : `<b>${fHours(tt[1])}</b><div class="meta">${t('x.time')}</div>`;
+    return `<a class="row" href="#exercise-${ei}"><span class="dot" style="background:var(--accent)"></span><span><span class="nm">${esc(M.ex[ei])}</span><div class="meta">${t('x.meta', nf.format(tt[2]), D.ex.inW[ei].length)}${ys.length ? ' · ' + Math.min(...ys) + (Math.max(...ys) !== Math.min(...ys) ? '–' + Math.max(...ys) : '') : ''}</div></span><span class="rt">${main}</span></a>`;
+  }).join('') || `<div class="empty">${t('x.empty')}</div>`;
+  $('xmore').innerHTML = idx.length > XS.limit ? `<button type="button" class="btn" id="btnXMore">${t('more', nf.format(Math.min(150, idx.length - XS.limit)))}</button>` : '';
 }
 const fHours = (s) => s >= 36000 ? nf.format(Math.round(s / 3600)) + ' h' : s >= 3600 ? nf1.format(s / 3600) + ' h' : Math.round(s / 60) + ' min';
 function exerciseDetail(ei) {
   const name = M.ex[ei];
-  if (name === undefined) return `<div class="empty">Diese Übung gibt es in den geladenen Daten nicht. <a href="#exercises">Zur Liste</a></div>`;
-  const t = M.exTot[ei], yo = M.exY[ei] || {};
+  if (name === undefined) return `<div class="empty">${t('x.missing')} <a href="#exercises">${t('toList')}</a></div>`;
+  const tt = M.exTot[ei], yo = M.exY[ei] || {};
   const years = Object.keys(yo).map(Number).sort((a, b) => a - b);
-  const useReps = t[0] > 0;
+  const useReps = tt[0] > 0;
   const val = (y) => (yo[y] ? (useReps ? yo[y][0] : yo[y][1] / 60) : 0);
   const topY = years.reduce((a, y) => (a === null || val(y) > val(a) ? y : a), null);
-  let html = `<section class="sec"><a class="back" href="#exercises">← Alle Übungen</a><div class="dhead"><h1>${esc(name)}</h1>
-    <div class="note">${years.length ? 'In deinen Trainings von ' + years[0] + ' bis ' + years[years.length - 1] : 'Keine Rundendaten'}</div></div>
+  let html = `<section class="sec"><a class="back" href="#exercises">${t('x.back')}</a><div class="dhead"><h1>${esc(name)}</h1>
+    <div class="note">${years.length ? t('x.range', years[0], years[years.length - 1]) : t('x.noRounds')}</div></div>
     <div class="stats">
-      ${t[0] ? stat('Wiederholungen', nf.format(t[0]), 'insgesamt') : ''}
-      ${stat('Zeit', unit(fHours(t[1])), 'insgesamt in dieser Übung')}
-      ${stat('Vorkommen', nf.format(t[2]) + '×', 'in ' + D.ex.inW[ei].length + ' Workouts')}
-      ${topY ? stat('Stärkstes Jahr', String(topY), useReps ? nf.format(yo[topY][0]) + ' Wiederholungen' : fHours(yo[topY][1])) : ''}
+      ${tt[0] ? stat(t('x.reps'), nf.format(tt[0]), t('x.total')) : ''}
+      ${stat(t('x.time'), unit(fHours(tt[1])), t('x.timeSub'))}
+      ${stat(t('x.occ'), nf.format(tt[2]) + '×', t('x.inW', D.ex.inW[ei].length))}
+      ${topY ? stat(t('x.topY'), String(topY), useReps ? t('d.totalReps', nf.format(yo[topY][0])) : fHours(yo[topY][1])) : ''}
     </div></section>`;
   if (years.length) {
     const y0 = years[0], y1 = years[years.length - 1], rows = [];
     for (let y = y0; y <= y1; y++) rows.push([y, val(y)]);
-    html += `<section class="panel sec"><h2>${useReps ? 'Wiederholungen' : 'Minuten'} pro Jahr</h2>${simpleBars(rows, useReps ? (v) => nf.format(Math.round(v)) : (v) => nf.format(Math.round(v)) + ' min')}</section>`;
+    html += `<section class="panel sec"><h2>${t('x.perYear', useReps)}</h2>${simpleBars(rows, useReps ? (v) => nf.format(Math.round(v)) : (v) => nf.format(Math.round(v)) + ' min')}</section>`;
   }
   const ws = D.ex.inW[ei].slice().sort((a, b) => D.wInfo[b[0]].count - D.wInfo[a[0]].count);
-  if (ws.length) html += `<section class="panel sec"><div class="sechead"><h2>Kommt vor in</h2><span class="note">${ws.length} Workouts, nach Häufigkeit</span></div><div class="list">${ws.slice(0, 40).map(([wi, reps, secs]) => { const w = M.w[wi];
-      return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span><div class="meta">${nf.format(D.wInfo[wi].count)}× gemacht · zuletzt ${fDate(D.wInfo[wi].last)}</div></span><span class="rt">${reps ? '<b>' + nf.format(reps) + '</b><div class="meta">Wdh. pro Workout</div>' : secs ? '<b>' + fTime(secs) + '</b><div class="meta">pro Workout</div>' : ''}</span></a>`; }).join('')}</div>${ws.length > 40 ? `<div class="note">und ${ws.length - 40} weitere</div>` : ''}</section>`;
+  if (ws.length) html += `<section class="panel sec"><div class="sechead"><h2>${t('x.in')}</h2><span class="note">${t('x.inSub', ws.length)}</span></div><div class="list">${ws.slice(0, 40).map(([wi, reps, secs]) => { const w = M.w[wi];
+      return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span><div class="meta">${t('x.wmeta', nf.format(D.wInfo[wi].count), fDate(D.wInfo[wi].last))}</div></span><span class="rt">${reps ? '<b>' + nf.format(reps) + `</b><div class="meta">${t('x.perW')}</div>` : secs ? '<b>' + fTime(secs) + `</b><div class="meta">${t('x.perW2')}</div>` : ''}</span></a>`; }).join('')}</div>${ws.length > 40 ? `<div class="note">${t('x.andMore', ws.length - 40)}</div>` : ''}</section>`;
   return html;
 }
 function simpleBars(rows, fmt) {
   const max = Math.max(...rows.map((r) => r[1]), 1), ticks = niceTicks(0, max, 4), tmax = ticks[ticks.length - 1];
   const W = 900, H = 220, L = 56, B = 22, T = 10, bw = (W - L) / rows.length;
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Balken pro Jahr">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${t('bars.aria')}">`;
   ticks.forEach((t) => { const y = T + (H - B - T) * (1 - t / tmax); s += `<line class="axis" x1="${L}" x2="${W}" y1="${y}" y2="${y}"/><text x="${L - 8}" y="${y + 4}" text-anchor="end">${fmt(t)}</text>`; });
   rows.forEach(([lab, v], i) => { const h = (H - B - T) * v / tmax, x = L + i * bw + bw * 0.18;
     s += `<rect x="${x}" y="${H - B - h}" width="${bw * 0.64}" height="${h}" rx="2" style="fill:var(--accent)"><title>${lab}: ${fmt(v)}</title></rect><text x="${x + bw * 0.32}" y="${H - 6}" text-anchor="middle">${rows.length > 10 ? String(lab).slice(2) : lab}</text>`; });
@@ -437,21 +480,21 @@ function timelineView() {
   const mLabel = (k) => MON[(mStart + k) % 12] + ' ' + Math.floor((mStart + k) / 12);
   const geo = { n, mStart, W: 900, L: 56, R: 12 };
   const allBody = M.body || [], mealKeys = Object.keys(M.meals || {}).map(Number);
-  let html = `<section class="sec"><div class="dhead"><h1>Verlauf</h1><div class="note">Monat für Monat: Training, Körpergewicht, Ernährung und Kilometer auf einer Zeitachse.</div></div>
-    <div class="tools"><div class="seg" role="group" aria-label="Zeitraum">${[['all', 'Alles'], ['60', '5 Jahre'], ['12', '12 Monate']].map(([k, l]) => `<button type="button" data-range="${k}" aria-pressed="${TL.range === k}">${l}</button>`).join('')}</div>
-      ${[['body', 'Gewicht'], ['meals', 'Ernährung'], ['dist', 'Kilometer']].map(([k, l]) => `<button type="button" class="chip" data-layer="${k}" aria-pressed="${TL.layers[k]}">${l}</button>`).join('')}</div></section>`;
-  html += `<section class="panel sec"><div class="sechead"><h2>Trainingsstunden</h2><div class="legend">${CATS.map((c) => `<span><span class="sw c-${c}"></span>${CAT[c]}</span>`).join('')}</div></div>
+  let html = `<section class="sec"><div class="dhead"><h1>${t('nav.timeline')}</h1><div class="note">${t('tl.sub')}</div></div>
+    <div class="tools"><div class="seg" role="group" aria-label="${t('tl.range')}">${[['all', t('tl.all')], ['60', t('tl.5y')], ['12', t('tl.12m')]].map(([k, l]) => `<button type="button" data-range="${k}" aria-pressed="${TL.range === k}">${l}</button>`).join('')}</div>
+      ${[['body', t('tl.weight')], ['meals', t('tl.nutrition')], ['dist', t('tl.km')]].map(([k, l]) => `<button type="button" class="chip" data-layer="${k}" aria-pressed="${TL.layers[k]}">${l}</button>`).join('')}</div></section>`;
+  html += `<section class="panel sec"><div class="sechead"><h2>${t('tl.hours')}</h2><div class="legend">${CATS.map((c) => `<span><span class="sw c-${c}"></span>${CAT[c]}</span>`).join('')}</div></div>
     ${monthBars(geo, hours.map((h) => CATS.map((c) => [c, h[c]])), 200, (v) => nf1.format(v) + ' h', mLabel, true)}</section>`;
   if (TL.layers.body) {
-    html += foldHead('body', 'Körpergewicht', `<span class="note">${allBody.length ? allBody.length + ' Einträge aus dem Ernährungs-Coach, ' + fDate(allBody[0][0]) + ' bis ' + fDate(allBody[allBody.length - 1][0]) : 'Keine Gewichtsdaten im Export'}</span>`) +
-      `${body.length ? weightLine(geo, body, mk) : `<div class="empty">Im gewählten Zeitraum gibt es keine Gewichtseinträge.</div>`}</div></details>`;
+    html += foldHead('body', t('tl.body'), `<span class="note">${allBody.length ? t('tl.bodyNote', allBody.length, fDate(allBody[0][0]), fDate(allBody[allBody.length - 1][0])) : t('tl.noBody')}</span>`) +
+      `${body.length ? weightLine(geo, body, mk) : `<div class="empty">${t('tl.noBodyRange')}</div>`}</div></details>`;
   }
   if (TL.layers.meals) {
-    html += foldHead('meals', 'Gekochte Mahlzeiten', `<div class="legend"><span><span class="sw" style="background:var(--mob)"></span>Coach-Plan</span><span><span class="sw" style="background:var(--lauf)"></span>Frei gewählt</span></div>`) + `
-      ${mealRows.some((r) => r.coach || r.frei) ? monthBars(geo, mealRows.map((r) => [['mob', r.coach], ['lauf', r.frei]]), 140, (v) => nf.format(Math.round(v)), mLabel, false) : `<div class="empty">${mealKeys.length ? 'Im gewählten Zeitraum gibt es keine Mahlzeiten.' : 'Keine Ernährungsdaten im Export.'}</div>`}</div></details>`;
+    html += foldHead('meals', t('tl.meals'), `<div class="legend"><span><span class="sw" style="background:var(--mob)"></span>${t('tl.coach')}</span><span><span class="sw" style="background:var(--lauf)"></span>${t('tl.free')}</span></div>`) + `
+      ${mealRows.some((r) => r.coach || r.frei) ? monthBars(geo, mealRows.map((r) => [['mob', r.coach], ['lauf', r.frei]]), 140, (v) => nf.format(Math.round(v)), mLabel, false) : `<div class="empty">${mealKeys.length ? t('tl.noMealsRange') : t('tl.noMeals')}</div>`}</div></details>`;
   }
   if (TL.layers.dist) {
-    html += `<section class="panel sec"><div class="sechead"><h2>Kilometer</h2><div class="legend"><span><span class="sw c-lauf"></span>Laufen</span><span><span class="sw c-rad"></span>Rad</span></div></div>
+    html += `<section class="panel sec"><div class="sechead"><h2>${t('tl.kmTitle')}</h2><div class="legend"><span><span class="sw c-lauf"></span>${CAT.lauf}</span><span><span class="sw c-rad"></span>${CAT.rad}</span></div></div>
       ${monthBars(geo, km.map((k) => [['lauf', k.lauf], ['rad', k.rad]]), 140, (v) => nf.format(Math.round(v)) + ' km', mLabel, false)}</section>`;
   }
   return html;
@@ -461,7 +504,7 @@ function monthBars(geo, stacks, H, fmt, mLabel, withAxisYears) {
   const tot = stacks.map((s) => s.reduce((a, x) => a + x[1], 0));
   const max = Math.max(...tot, 0.0001), ticks = niceTicks(0, max, 3), tmax = ticks[ticks.length - 1];
   const bw = (W - L - R) / n;
-  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="Werte pro Monat">`;
+  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="${t('mb.aria')}">`;
   ticks.forEach((t) => { const y = T + (H - B - T) * (1 - t / tmax); s += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/><text x="${L - 8}" y="${y + 4}" text-anchor="end">${fmt(t)}</text>`; });
   s += monthAxis(geo, H, B);
   stacks.forEach((st, k) => {
@@ -486,7 +529,7 @@ function weightLine(geo, body, mk) {
   const ws = body.map((b) => b[1]); let lo = Math.min(...ws) - 1, hi = Math.max(...ws) + 1;
   const ticks = niceTicks(lo, hi, 3); lo = ticks[0]; hi = ticks[ticks.length - 1];
   const Y = (v) => T + (H - B - T) * (1 - (v - lo) / (hi - lo));
-  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="Körpergewicht">`;
+  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="${t('tl.body')}">`;
   ticks.forEach((t) => s += `<line class="axis" x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${L - 8}" y="${Y(t) + 4}" text-anchor="end">${nf.format(t)} kg</text>`);
   s += monthAxis(geo, H, B);
   s += `<path d="${body.map((b, i) => (i ? 'L' : 'M') + X(b[0]).toFixed(1) + ' ' + Y(b[1]).toFixed(1)).join(' ')}" fill="none" style="stroke:var(--accent)" stroke-width="1.5" opacity=".6"/>`;
@@ -512,10 +555,10 @@ function route() {
   window.scrollTo(0, 0);
 }
 function welcome() {
-  return `<section class="sec welcome"><h1>Dein Trainingsarchiv</h1>
-    <p class="unoff"><b>Inoffiziell.</b> Diese App ist ein privates Projekt und kein Produkt von Freeletics. Sie liest nur den Datenexport, den du selbst bei Freeletics anforderst.</p>
-    <p>Lade einmal deinen Freeletics-Datenexport, und du siehst alle Trainings seit deinem ersten Workout: Serien, Bestzeiten, Übungen und Verlauf. Die Daten bleiben auf diesem Gerät.</p>
-    <ol class="steps"><li>Fordere bei Freeletics deinen Datenexport an. Du bekommst eine ZIP-Datei, deren Name mit <b>fl_uid_</b> beginnt.</li><li>Wähle oben genau diese ZIP-Datei aus. Entpacken ist nicht nötig.</li><li>Fertig. Beim nächsten Öffnen sind die Daten sofort da.</li></ol></section>`;
+  return `<section class="sec welcome"><h1>${t('wel.h1')}</h1>
+    <p class="unoff">${t('wel.unoff')}</p>
+    <p>${t('wel.p')}</p>
+    <ol class="steps"><li>${t('wel.s1')}</li><li>${t('wel.s2')}</li><li>${t('wel.s3')}</li></ol></section>`;
 }
 addEventListener('hashchange', route);
 $('view').addEventListener('toggle', (e) => { const d = e.target; if (!d.dataset || !d.dataset.fold) return; TL.open[d.dataset.fold] = d.open; try { localStorage.setItem('ta-tl-open', JSON.stringify(TL.open)); } catch (err) {} }, true);
@@ -539,14 +582,6 @@ $('view').addEventListener('change', (e) => {
   if (e.target.id === 'sort') { LS.sort = e.target.value; renderList(); }
   if (e.target.id === 'xsort') { XS.sort = e.target.value; renderExList(); }
 });
-function heatTip(e) {
-  const r = e.target.closest && e.target.closest('rect[data-d]'); if (!r) { hideTip(); return; }
-  const d = +r.dataset.d, ss = D.dayMap.get(d) || [];
-  const min = Math.round(ss.reduce((a, i) => a + M.s.dur[i], 0) / 60);
-  showTip(`<b>${WD[(dDate(d).getUTCDay() + 6) % 7]}, ${fDate(d)}</b> · ${min} min<br>${ss.slice(0, 6).map((i) => esc(M.w[M.s.w[i]].n)).join('<br>')}${ss.length > 6 ? '<br>+' + (ss.length - 6) + ' weitere' : ''}`, e.clientX, e.clientY);
-}
-$('view').addEventListener('mousemove', (e) => { if (e.target.closest('#heat')) heatTip(e); else if (!tip.hidden) hideTip(); });
-$('view').addEventListener('click', (e) => { if (e.target.closest('#heat')) heatTip(e); });
 $('view').addEventListener('mouseleave', hideTip);
 addEventListener('scroll', hideTip, { passive: true });
 
@@ -555,39 +590,44 @@ const MODEL_V = 2;
 const PREVIEW = !!window.TA_PREVIEW;
 function setModel(m, src) {
   M = m; source = src; D = derive(m); D.ex = exInfo(m);
-  const when = fDate(Math.round(Date.parse(m.created) / DAY));
-  $('srcLabel').textContent = src === 'seed' ? 'Mitgelieferter Export vom 01.11.2026' : 'Daten vom ' + when;
+  updateSrcLabel();
   $('btnReset').hidden = src === 'seed';
   $('btnBackup').hidden = PREVIEW;
   route();
 }
-const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
+function updateSrcLabel() {
+  if (!M) { $('srcLabel').textContent = t('src.none'); return; }
+  $('srcLabel').textContent = source === 'seed' ? t('src.seed', fDate(Math.round(Date.UTC(2026, 10, 1) / DAY))) : t('src.data', fDate(Math.round(Date.parse(M.created) / DAY)));
+}
+const status = (msg, err) => { $('status').textContent = msg; $('status').classList.toggle('err', !!err); };
 function toggleUpload(show) { const s = $('uploadSec'); s.hidden = show === undefined ? !s.hidden : !show; $('btnData').setAttribute('aria-expanded', !s.hidden); }
 async function handleFile(f) {
   if (!f) return;
   try {
-    status('Lese ' + f.name + ' …');
+    status(t('stat.reading', f.name));
     let text;
     if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) {
       text = await readZipEntry(f, /(^|\/)data\.json$/i);
-      if (text === null) throw new Error('In der ZIP fehlt die data.json. Wähle den Freeletics-Export oder die data.json direkt.');
+      if (text === null) throw Object.assign(new Error(t('err.noData')), { known: true });
     } else text = await f.text();
-    status('Werte Trainings aus …');
+    status(t('stat.analyzing'));
     await new Promise((r) => setTimeout(r, 20));
-    let raw; try { raw = JSON.parse(text); } catch (e) { throw new Error('Die Datei ist kein gültiges JSON. Erwartet wird die data.json aus dem Freeletics-Export oder eine Sicherung aus dieser App.'); }
+    let raw; try { raw = JSON.parse(text); } catch (e) { throw Object.assign(new Error(t('err.json')), { known: true }); }
     let m, kind;
     if (raw && raw.app === 'trainingsarchiv' && raw.model) {
-      if (raw.model.v !== MODEL_V) throw new Error('Diese Sicherung stammt aus einer anderen App-Version. Lade bitte den Freeletics-Export neu.');
-      m = raw.model; kind = 'Sicherung';
-    } else { m = processExport(raw); kind = 'Export'; }
+      if (raw.model.v !== MODEL_V) throw Object.assign(new Error(t('err.backupVersion')), { known: true });
+      m = raw.model; kind = t('kind.backup');
+    } else { m = processExport(raw); kind = t('kind.export'); }
     const saved = await DB.set('model', m);
     try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
     setModel(m, 'upload');
     setTimeout(() => toggleUpload(false), 2500);
-    status(kind + ' geladen: ' + nf.format(m.s.w.length) + ' Trainings' + (saved ? '. Gespeichert auf diesem Gerät.' : '. Speichern war hier nicht möglich, die Daten gelten nur bis zum Schließen.'));
+    status(t('stat.loaded', kind, nf.format(m.s.w.length), saved));
   } catch (e) {
     let msg = e && e.message || String(e);
-    if (e && (e.name === 'TypeError' || e.name === 'NotReadableError') && !e.zip) msg = 'Die Datei konnte nicht gelesen werden (' + msg + '). Wähle sie bitte noch einmal aus. Klappt es weiterhin nicht, entpacke die ZIP und wähle die data.json direkt.';
+    if (e && e.zip && e.code) msg = t('zip.' + e.code, e.arg) + ' ' + t('zip.suffix');
+    else if (e && e.code === 'notrainings') msg = t('err.notrainings');
+    else if (e && !e.known && (e.name === 'TypeError' || e.name === 'NotReadableError')) msg = t('err.read', msg);
     status(msg, true);
   }
 }
@@ -598,19 +638,28 @@ drop.addEventListener('dragleave', () => drop.classList.remove('over'));
 drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
 $('btnData').addEventListener('click', () => toggleUpload());
 $('btnReset').addEventListener('click', async () => {
-  if ($('btnReset').dataset.armed !== '1') { $('btnReset').dataset.armed = '1'; $('btnReset').textContent = 'Wirklich entfernen?'; setTimeout(() => { $('btnReset').dataset.armed = ''; $('btnReset').textContent = 'Daten von diesem Gerät entfernen'; }, 4000); return; }
-  await DB.del('model'); $('btnReset').dataset.armed = ''; $('btnReset').textContent = 'Daten von diesem Gerät entfernen';
+  if ($('btnReset').dataset.armed !== '1') { $('btnReset').dataset.armed = '1'; $('btnReset').textContent = t('btn.resetConfirm'); setTimeout(() => { $('btnReset').dataset.armed = ''; $('btnReset').textContent = t('btn.reset'); }, 4000); return; }
+  await DB.del('model'); $('btnReset').dataset.armed = ''; $('btnReset').textContent = t('btn.reset');
   const s = seed();
-  if (s) { setModel(s, 'seed'); status('Gespeicherte Daten entfernt. Angezeigt wird wieder der mitgelieferte Export.'); }
-  else { M = null; D = null; $('srcLabel').textContent = 'Keine Daten'; $('btnReset').hidden = true; $('btnBackup').hidden = true; status('Daten von diesem Gerät entfernt.'); route(); }
+  if (s) { setModel(s, 'seed'); status(t('stat.removedSeed')); }
+  else { M = null; D = null; updateSrcLabel(); $('btnReset').hidden = true; $('btnBackup').hidden = true; status(t('stat.removed')); route(); }
 });
 $('btnBackup').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify({ app: 'trainingsarchiv', saved: new Date().toISOString(), model: M })], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'trainingsarchiv-sicherung-' + new Date().toISOString().slice(0, 10) + '.json';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = t('backup.file') + new Date().toISOString().slice(0, 10) + '.json';
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  status('Sicherung erstellt (' + nf1.format(blob.size / 1e6) + ' MB). Zum Wiederherstellen einfach diese Datei wieder auswählen.');
+  status(t('stat.backup', nf1.format(blob.size / 1e6)));
 });
 function seed() { const el = $('seed'); if (!el) return null; try { return JSON.parse(el.textContent); } catch (e) { return null; } }
+
+/* ---------- Sprachumschalter ---------- */
+$('btnLang').addEventListener('click', () => {
+  LANG = LANG === 'de' ? 'en' : 'de';
+  try { localStorage.setItem('ta-lang', LANG); } catch (e) {}
+  applyLang(); updateSrcLabel(); status('');
+  const y = scrollY; route(); scrollTo(0, y);
+  if ($('btnReset').dataset.armed !== '1') $('btnReset').textContent = t('btn.reset');
+});
 
 /* ---------- Installation ---------- */
 let installEvt = null;
@@ -634,7 +683,7 @@ if (!PREVIEW && 'serviceWorker' in navigator && /^https?:$/.test(location.protoc
   if (stored && stored.v === MODEL_V) { setModel(stored, 'upload'); return; }
   const s = seed();
   if (s) setModel(s, 'seed');
-  else { $('srcLabel').textContent = 'Keine Daten'; toggleUpload(true); route(); }
-  if (stored) status('Die gespeicherten Daten stammen aus einer älteren App-Version. Lade den Export bitte einmal neu.', true);
+  else { updateSrcLabel(); toggleUpload(true); route(); }
+  if (stored) status(t('stat.oldModel'), true);
 })();
 })();

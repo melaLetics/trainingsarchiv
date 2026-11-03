@@ -10,7 +10,7 @@
   const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
   const u64 = (b, o) => u32(b, o) + u32(b, o + 4) * 0x100000000;
 
-  function zipError(msg) { const e = new Error(msg + ' Entpacke die ZIP und wähle die data.json direkt.'); e.zip = true; return e; }
+  function zipError(code, msg, arg) { const e = new Error(msg + ' Entpacke die ZIP und wähle die data.json direkt.'); e.zip = true; e.code = code; e.arg = arg; return e; }
 
   async function findCentralDirectory(file) {
     const tailLen = Math.min(file.size, 65557);
@@ -18,13 +18,13 @@
     const tail = await readBytes(file, tailStart, tailLen);
     let eocd = -1;
     for (let i = tail.length - 22; i >= 0; i--) if (u32(tail, i) === 0x06054b50) { eocd = i; break; }
-    if (eocd < 0) throw zipError('Die Datei ist keine gültige ZIP-Datei.');
+    if (eocd < 0) throw zipError('notzip', 'Die Datei ist keine gültige ZIP-Datei.');
     let count = u16(tail, eocd + 10), cdSize = u32(tail, eocd + 12), cdOff = u32(tail, eocd + 16);
     // ZIP64: Locator steht direkt vor dem EOCD
     if ((count === 0xffff || cdSize === MAX32 || cdOff === MAX32) && eocd >= 20 && u32(tail, eocd - 20) === 0x07064b50) {
       const eocd64Off = u64(tail, eocd - 20 + 8);
       const e64 = await readBytes(file, eocd64Off, 56);
-      if (u32(e64, 0) !== 0x06064b50) throw zipError('Das ZIP64-Verzeichnis der Datei ist beschädigt.');
+      if (u32(e64, 0) !== 0x06064b50) throw zipError('zip64bad', 'Das ZIP64-Verzeichnis der Datei ist beschädigt.');
       count = u64(e64, 32); cdSize = u64(e64, 40); cdOff = u64(e64, 48);
     }
     return { count, cdSize, cdOff };
@@ -59,7 +59,7 @@
       }
     } catch (e) {
       // Manche Packer hängen Daten an den komprimierten Strom an. Was bis dahin entpackt wurde, ist vollständig.
-      if (!got) throw zipError('Die ZIP-Datei konnte nicht entpackt werden (' + (e && e.message || e) + ').');
+      if (!got) throw zipError('inflate', 'Die ZIP-Datei konnte nicht entpackt werden (' + (e && e.message || e) + ').', String(e && e.message || e));
     }
     return out + dec.decode();
   }
@@ -82,14 +82,14 @@
       p += 46 + nameLen + extraLen + comLen;
     }
     if (!entry) return null;
-    if (entry.flags & 0x1) throw zipError('Die ZIP-Datei ist verschlüsselt.');
+    if (entry.flags & 0x1) throw zipError('encrypted', 'Die ZIP-Datei ist verschlüsselt.');
     const lh = await readBytes(file, entry.lho, 30);
-    if (u32(lh, 0) !== 0x04034b50) throw zipError('Die ZIP-Datei ist beschädigt.');
+    if (u32(lh, 0) !== 0x04034b50) throw zipError('broken', 'Die ZIP-Datei ist beschädigt.');
     const dataStart = entry.lho + 30 + u16(lh, 26) + u16(lh, 28);
     const blob = file.slice(dataStart, dataStart + entry.csize);
     if (entry.method === 0) return await blob.text();
-    if (entry.method !== 8) throw zipError('Die ZIP-Datei nutzt ein Kompressionsverfahren, das der Browser nicht kennt (Methode ' + entry.method + ').');
-    if (typeof DecompressionStream === 'undefined') throw zipError('Dieser Browser kann ZIP-Dateien nicht entpacken.');
+    if (entry.method !== 8) throw zipError('method', 'Die ZIP-Datei nutzt ein Kompressionsverfahren, das der Browser nicht kennt (Methode ' + entry.method + ').', entry.method);
+    if (typeof DecompressionStream === 'undefined') throw zipError('nodecomp', 'Dieser Browser kann ZIP-Dateien nicht entpacken.');
     return await inflateToText(blob);
   }
 

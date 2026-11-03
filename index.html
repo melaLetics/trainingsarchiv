@@ -26,37 +26,38 @@
 <!-- BODY:START -->
 <header>
   <div class="wrap bar">
-    <div class="brand">Trainingsarchiv<small>inoffiziell</small></div>
-    <nav aria-label="Ansichten">
-      <a href="#overview" id="nav-overview">Überblick</a>
-      <a href="#workouts" id="nav-workouts">Workouts</a>
-      <a href="#exercises" id="nav-exercises">Übungen</a>
-      <a href="#timeline" id="nav-timeline">Verlauf</a>
+    <div class="brand"><span data-i18n="brand">Trainingsarchiv</span><small data-i18n="brand.small">inoffizielles Freeletics-Archiv</small></div>
+    <nav aria-label="Ansichten" data-i18n-aria="nav.aria">
+      <a href="#overview" id="nav-overview" data-i18n="nav.overview">Überblick</a>
+      <a href="#workouts" id="nav-workouts" data-i18n="nav.workouts">Workouts</a>
+      <a href="#exercises" id="nav-exercises" data-i18n="nav.exercises">Übungen</a>
+      <a href="#timeline" id="nav-timeline" data-i18n="nav.timeline">Verlauf</a>
     </nav>
-    <div class="datachip"><span id="srcLabel">…</span><button class="btn" id="btnData" type="button" aria-expanded="false" aria-controls="uploadSec">Daten</button><button class="btn primary" id="btnInstall" type="button" hidden>App installieren</button></div>
+    <div class="datachip"><span id="srcLabel">…</span><button class="btn" id="btnData" type="button" aria-expanded="false" aria-controls="uploadSec" data-i18n="btn.data">Daten</button><button class="btn lang" id="btnLang" type="button" data-i18n="lang.btn" data-i18n-aria="lang.aria" aria-label="Auf Englisch umschalten">EN</button><button class="btn primary" id="btnInstall" type="button" hidden data-i18n="btn.install">App installieren</button></div>
   </div>
 </header>
 <div class="hint" id="iosHint" hidden>
-  <div class="wrap"><span>Als App nutzen: in Safari auf <b>Teilen</b> tippen und <b>Zum Home-Bildschirm</b> wählen. Dann bleiben deine Daten dauerhaft gespeichert.</span><button class="btn" id="btnIosHint" type="button">Verstanden</button></div>
+  <div class="wrap"><span data-i18n-html="ios.hint">Als App nutzen: in Safari auf <b>Teilen</b> tippen und <b>Zum Home-Bildschirm</b> wählen. Dann bleiben deine Daten dauerhaft gespeichert.</span><button class="btn" id="btnIosHint" type="button" data-i18n="ios.ok">Verstanden</button></div>
 </div>
 
 <div class="wrap">
   <section class="sec" id="uploadSec" hidden style="padding-top:20px">
     <div class="drop" id="drop">
-      <h2>Daten laden</h2>
-      <p class="lead">Wähle die ZIP-Datei so, wie du sie von Freeletics bekommen hast. Ihr Name beginnt mit <b>fl_uid_</b>. Du musst sie nicht entpacken, und umbenennen darfst du sie auch.</p>
-      <div class="pick"><label for="file" class="btn primary">ZIP-Datei auswählen</label><span class="note">oder die Datei hierher ziehen</span></div>
+      <h2 data-i18n="up.title">Daten laden</h2>
+      <p class="lead" data-i18n-html="up.lead">Wähle die ZIP-Datei so, wie du sie von Freeletics bekommen hast. Ihr Name beginnt mit <b>fl_uid_</b>. Du musst sie nicht entpacken, und umbenennen darfst du sie auch.</p>
+      <div class="pick"><label for="file" class="btn primary" data-i18n="up.pick">ZIP-Datei auswählen</label><span class="note" data-i18n="up.drag">oder die Datei hierher ziehen</span></div>
       <input type="file" id="file" class="vh" accept=".zip,.json,application/zip,application/json">
-      <div class="note">Statt der ZIP geht auch die <b>data.json</b> daraus oder eine Sicherung aus dieser App. Die Datei wird nur auf diesem Gerät gelesen und gespeichert. Sie wird nirgendwohin übertragen.</div>
+      <div class="note" data-i18n-html="up.note">Statt der ZIP geht auch die <b>data.json</b> daraus oder eine Sicherung aus dieser App. Die Datei wird nur auf diesem Gerät gelesen und gespeichert. Sie wird nirgendwohin übertragen.</div>
       <div class="status" id="status" role="status"></div>
-      <div class="tools"><button class="btn" id="btnBackup" type="button" hidden>Sicherung herunterladen</button><button class="btn" id="btnReset" type="button" hidden>Daten von diesem Gerät entfernen</button></div>
+      <div class="tools"><button class="btn" id="btnBackup" type="button" hidden data-i18n="btn.backup">Sicherung herunterladen</button><button class="btn" id="btnReset" type="button" hidden data-i18n="btn.reset">Daten von diesem Gerät entfernen</button></div>
     </div>
   </section>
   <main id="view"></main>
 </div>
-<footer class="foot"><div class="wrap">Inoffizielles Projekt: Trainingsarchiv steht in keiner Verbindung zu Freeletics und wird von Freeletics weder angeboten noch unterstützt oder geprüft. „Freeletics“ ist eine Marke ihres Inhabers und wird hier nur verwendet, um zu beschreiben, welche Daten die App liest.</div></footer>
+<footer class="foot"><div class="wrap" data-i18n="foot">Inoffizielles Projekt: Trainingsarchiv steht in keiner Verbindung zu Freeletics und wird von Freeletics weder angeboten noch unterstützt oder geprüft. „Freeletics“ ist eine Marke ihres Inhabers und wird hier nur verwendet, um zu beschreiben, welche Daten die App liest.</div></footer>
 <div id="tip" hidden></div>
 <!-- BODY:END -->
+<script src="js/i18n.js"></script>
 <script src="js/proc.js"></script>
 <script src="js/unzip.js"></script>
 <script src="js/app.js"></script>

@@ -17,7 +17,7 @@ const head = between(index, '<!-- HEAD:START -->', '<!-- HEAD:END -->')
   .replace(/<meta charset[^>]*>\s*/, '').replace(/<meta name="viewport"[^>]*>\s*/, '');
 const body = between(index, '<!-- BODY:START -->', '<!-- BODY:END -->');
 const css = await read('css/app.css');
-const js = ['js/proc.js', 'js/unzip.js', 'js/app.js'];
+const js = ['js/i18n.js', 'js/proc.js', 'js/unzip.js', 'js/app.js'];
 const scripts = (await Promise.all(js.map(read))).map((s) => `<script>\n${s}\n</script>`).join('\n');
 
 let seed = '';

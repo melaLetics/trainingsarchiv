@@ -1,9 +1,9 @@
 /* Service Worker: hält die App offline verfügbar.
    Bei Änderungen an App-Dateien VERSION erhöhen, damit Geräte die neue Fassung laden. */
-const VERSION = 'ta-v6';
+const VERSION = 'ta-v11';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/proc.js', 'js/unzip.js', 'js/app.js',
+  'js/i18n.js', 'js/proc.js', 'js/unzip.js', 'js/app.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.png'
 ];
 

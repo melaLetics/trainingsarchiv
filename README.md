@@ -25,6 +25,8 @@ Service Worker und „App installieren“ funktionieren nur über `localhost` od
 - **Übungen**: Summen pro Übung, Verlauf pro Jahr, Workouts, in denen die Übung vorkommt
 - **Verlauf**: Trainingsstunden pro Monat, dazu Körpergewicht, gekochte Mahlzeiten und Kilometer auf derselben Zeitachse
 
+Die Oberfläche gibt es auf Deutsch und Englisch (Schaltfläche DE/EN oben). Beim ersten Start richtet sich die Sprache nach dem Browser, danach wird die Wahl gespeichert.
+
 ## Daten
 
 - Eingelesen wird nur die `data.json` aus dem Export. Aus der ZIP wird nur diese eine Datei entpackt (`js/unzip.js`, über `DecompressionStream`), das Archiv wird nicht komplett geladen.
@@ -51,6 +53,7 @@ Erzeugt `dist/preview.html`, eine einzelne Datei mit allem eingebettet, optional
 ```
 index.html              Seite und Grundgerüst
 css/app.css             Gestaltung (helles und dunkles Farbschema)
+js/i18n.js              Texte auf Deutsch und Englisch
 js/proc.js              Export -> Datenmodell (läuft im Browser und in Node)
 js/unzip.js             liest eine Datei aus einer ZIP
 js/app.js               Ansichten, Diagramme, Speicher, Installation
