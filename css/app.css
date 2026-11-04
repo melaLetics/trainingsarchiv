@@ -163,3 +163,22 @@ a { color: var(--accent); }
 .btn.lang { min-width: 40px; letter-spacing: .04em; }
 .brand small { white-space: nowrap; }
 @media (max-width: 560px) { .brand small { display: block; margin-left: 0; margin-top: 2px; } }
+
+/* Fortschritt */
+.techbars { display: grid; gap: 6px; }
+.techrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px; }
+.techrow .ty { color: var(--muted); font-variant-numeric: tabular-nums; }
+.techrow .tn { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.tbar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--sunk); }
+.tbar span { display: block; height: 100%; }
+.techrow.thin .tbar { opacity: .4; }
+@media (max-width: 420px) { .stat .v { font-size: 27px; } }
+/* Fortschritt: Werte rechts */
+.prow .ftl { font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.prow .ftl b { color: var(--fg); font-size: 20px; }
+.prow .ftl .arr { font-weight: 400; }
+.prow .chg { font-size: 13px; font-weight: 600; }
+.chg.up { color: var(--mob); } .chg.down { color: var(--pb); }
+.howto { font-size: 13px; color: var(--muted); }
+.howto summary { cursor: pointer; font-weight: 600; }
+.howto p { margin: 6px 0 0; max-width: 75ch; }

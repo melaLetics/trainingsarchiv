@@ -447,6 +447,8 @@ function exerciseDetail(ei) {
     for (let y = y0; y <= y1; y++) rows.push([y, val(y)]);
     html += `<section class="panel sec"><h2>${t('x.perYear', useReps)}</h2>${simpleBars(rows, useReps ? (v) => nf.format(Math.round(v)) : (v) => nf.format(Math.round(v)) + ' min')}</section>`;
   }
+  html += weightSection(ei);
+  html += exerciseTech(ei);
   const ws = D.ex.inW[ei].slice().sort((a, b) => D.wInfo[b[0]].count - D.wInfo[a[0]].count);
   if (ws.length) html += `<section class="panel sec"><div class="sechead"><h2>${t('x.in')}</h2><span class="note">${t('x.inSub', ws.length)}</span></div><div class="list">${ws.slice(0, 40).map(([wi, reps, secs]) => { const w = M.w[wi];
       return `<a class="row" href="#workout-${wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span><div class="meta">${t('x.wmeta', nf.format(D.wInfo[wi].count), fDate(D.wInfo[wi].last))}</div></span><span class="rt">${reps ? '<b>' + nf.format(reps) + `</b><div class="meta">${t('x.perW')}</div>` : secs ? '<b>' + fTime(secs) + `</b><div class="meta">${t('x.perW2')}</div>` : ''}</span></a>`; }).join('')}</div>${ws.length > 40 ? `<div class="note">${t('x.andMore', ws.length - 40)}</div>` : ''}</section>`;
@@ -537,8 +539,158 @@ function weightLine(geo, body, mk) {
   return s + '</svg></div>';
 }
 
+
+/* ---------- Fortschritt ---------- */
+const PG = { showAllUp: false, showAllDown: false };
+const median = (a) => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+function progressData() {
+  if (D.prog) return D.prog;
+  const S = M.s, rows = [];
+  M.w.forEach((w, wi) => {
+    if (w.c === 'mob' || w.t === 'free') return;
+    const m = D.wInfo[wi].metric; if (m !== 'dur' && m !== 'reps') return;
+    const ss = D.wSess[wi].filter((i) => mv(M, i, m) > 0); const n = ss.length; if (n < 10) return;
+    const v = ss.map((i) => mv(M, i, m)), lower = m === 'dur', k = Math.min(5, Math.floor(n / 3));
+    const first = median(v.slice(0, k)), last = median(v.slice(n - k)), best = lower ? Math.min(...v) : Math.max(...v);
+    const change = lower ? (first - last) / first : (last - first) / first;
+    const gap = lower ? (last - best) / best : (best - last) / best;
+    rows.push({ wi, m, n, k, first, last, best, change, gap, v, lastDay: S.day[ss[n - 1]] });
+  });
+  const up = rows.filter((r) => r.change > 0.02).sort((a, b) => b.change - a.change);
+  const down = rows.filter((r) => r.change < -0.02).sort((a, b) => a.change - b.change);
+  let pbLast = null, pbs = 0; const pbYear = {};
+  for (let i = 0; i < S.w.length; i++) if (S.f[i] & 2) { pbs++; pbLast = S.day[i]; const y = yearOf(S.day[i]); pbYear[y] = (pbYear[y] || 0) + 1; }
+  return (D.prog = { rows, up, down, pbs, pbLast, pbYear });
+}
+const TECH = ['bad', 'medium', 'good', 'vgood'];
+const techColor = { vgood: 'var(--mob)', good: 'color-mix(in srgb,var(--mob) 45%,var(--surface))', medium: 'var(--lauf)', bad: 'var(--pb)' };
+function techByYear(filter) {
+  const S = M.s, by = {};
+  for (let i = 0; i < S.w.length; i++) { const v = S.tf[i]; if (!v || !filter(i)) continue; const y = yearOf(S.day[i]); (by[y] = by[y] || [0, 0, 0, 0])[v - 1]++; }
+  return Object.keys(by).map(Number).sort((a, b) => a - b).map((y) => ({ y, c: by[y], n: by[y].reduce((a, b) => a + b, 0) }));
+}
+const techMin = (rows) => Math.max(20, Math.round(0.1 * Math.max(...rows.map((r) => r.n))));
+function techBars(rows) {
+  const min = techMin(rows);
+  const legend = `<div class="legend">${TECH.slice().reverse().map((k) => `<span><span class="sw" style="background:${techColor[k]}"></span>${t('tech.' + k)}</span>`).join('')}</div>`;
+  return legend + `<div class="techbars">${rows.map((r) => `<div class="techrow${r.n < min ? ' thin' : ''}"><span class="ty">${r.y}</span><span class="tbar" title="${r.y}: ${TECH.map((k, j) => t('tech.' + k) + ' ' + r.c[j]).reverse().join(', ')}">${[3, 2, 1, 0].map((j) => r.c[j] ? `<span style="width:${(r.c[j] / r.n * 100).toFixed(2)}%;background:${techColor[TECH[j]]}"></span>` : '').join('')}</span><span class="tn">${t('tech.n', nf.format(r.n))}</span></div>`).join('')}</div>${rows.some((r) => r.n < min) ? `<div class="note">${t('tech.thin', min, rows.filter((r) => r.n >= min).length >= 2)}</div>` : ''}`;
+}
+function techSummary(rows) {
+  const ok = rows.filter((r) => r.n >= techMin(rows)); if (ok.length < 2) return '';
+  const a = ok[0], b = ok[ok.length - 1];
+  return `<p class="note">${t('tech.trend', a.y, pctF(a.c[3] / a.n), b.y, pctF(b.c[3] / b.n))}</p>`;
+}
+function progRow(r) {
+  const w = M.w[r.wi], fm = (x) => fMetric(r.m, Math.round(x));
+  const lab = r.m === 'dur' ? (r.change > 0 ? t('pg.faster') : t('pg.slower')) : (r.change > 0 ? t('pg.more') : t('pg.fewer'));
+  return `<a class="row prow" href="#workout-${r.wi}"><span class="dot c-${w.c}"></span><span><span class="nm">${esc(w.n)}</span><div class="meta">${t('pg.meta', r.n, fm(r.best))}</div></span><span class="rt"><span class="ftl">${fm(r.first)} <span class="arr">→</span> <b>${fm(r.last)}</b></span><div class="chg ${r.change > 0 ? 'up' : 'down'}">${pctF(Math.abs(r.change))} ${lab}</div></span></a>`;
+}
+function progressView() {
+  const P = progressData(), S = M.s;
+  const today = todayDay();
+  const pb12 = (() => { let c = 0; for (let i = 0; i < S.w.length; i++) if ((S.f[i] & 2) && today - S.day[i] <= 365) c++; return c; })();
+  const top = P.up[0];
+  let html = `<section class="sec"><div class="dhead"><h1>${t('pg.h1')}</h1><div class="note">${t('pg.sub')}</div></div>
+    <div class="stats">
+      ${stat(t('pg.improved'), t('pg.ofN', nf.format(P.up.length), nf.format(P.rows.length)), t('pg.improvedSub'))}
+      ${top ? stat(t('pg.biggest'), pctF(top.change), esc(M.w[top.wi].n)) : ''}
+      ${P.pbLast !== null ? stat(t('pg.lastPb'), fDate(P.pbLast), t('pg.daysAgo', nf.format(today - P.pbLast))) : ''}
+      ${stat(t('pg.pbs'), nf.format(P.pbs), t('pg.pbs12', nf.format(pb12)))}
+    </div></section>`;
+  if (P.rows.length) {
+    const upList = PG.showAllUp ? P.up : P.up.slice(0, 5);
+    html += `<section class="panel sec"><div class="sechead"><h2>${t('pg.upH')}</h2></div>
+      <div class="note">${t('pg.upSub', P.up.length)}</div>
+      <div class="list">${upList.map(progRow).join('') || `<div class="empty">${t('pg.none')}</div>`}</div>
+      ${P.up.length > 5 ? `<div><button type="button" class="btn" data-pg="up">${PG.showAllUp ? t('pg.less') : t('pg.all', P.up.length)}</button></div>` : ''}</section>`;
+    if (P.down.length) html += `<details class="panel fold" data-pgdown${PG.showAllDown ? ' open' : ''}><summary><span class="chev" aria-hidden="true"></span><h2>${t('pg.downH')}</h2><span class="note">${t('pg.count', P.down.length)}</span></summary><div class="foldbody">
+      <div class="note">${t('pg.downNote')}</div>
+      <div class="list">${P.down.map(progRow).join('')}</div></div></details>`;
+    html += `<details class="howto"><summary>${t('pg.howH')}</summary><p>${t('pg.method')}</p></details>`;
+  } else html += `<div class="empty">${t('pg.noRows')}</div>`;
+  html += weightOverview();
+  const years = Object.keys(P.pbYear).map(Number);
+  if (years.length) {
+    const y0 = Math.min(...years), y1 = yearOf(D.days[D.days.length - 1]), rows = [];
+    for (let y = y0; y <= y1; y++) rows.push([y, P.pbYear[y] || 0]);
+    html += `<section class="panel sec"><h2>${t('pg.pbYear')}</h2>${simpleBars(rows, (v) => nf.format(Math.round(v)))}</section>`;
+  }
+  html += `<section class="panel sec"><h2>${t('tech.h')}</h2>`;
+  if (!S.tf) html += `<div class="empty">${t('tech.reload')}</div>`;
+  else {
+    const rows = techByYear(() => true);
+    html += rows.length ? techSummary(rows) + techBars(rows) + `<div class="note">${t('tech.noteAll')}</div>` : `<div class="empty">${t('tech.none')}</div>`;
+  }
+  return html + '</section>';
+}
+function exerciseTech(ei) {
+  const S = M.s; if (!S.tf || !S.x1) return '';
+  const rows = techByYear((i) => S.x1[i] === ei);
+  const n = rows.reduce((a, r) => a + r.n, 0); if (n < 5) return '';
+  return `<section class="panel sec"><div class="sechead"><h2>${t('tech.hEx')}</h2><span class="note">${t('tech.nEx', nf.format(n))}</span></div>${techSummary(rows)}${techBars(rows)}<div class="note">${t('tech.noteEx')}</div></section>`;
+}
+
+/* ---------- Gewichte (nur wenn der Export Gewichte enthält) ---------- */
+const hasWeights = () => !!(M.exW && Object.keys(M.exW).length);
+const fKg = (per, n) => per == null ? null : (n > 1 ? n + ' × ' : '') + nf1.format(per) + ' kg';
+function weightDays(ei) {
+  // pro Tag: schwerstes Gewicht, Sätze, Wiederholungen
+  const by = new Map();
+  for (const [day, per, n, reps, raw] of (M.exW || {})[ei] || []) {
+    const d = by.get(day) || { day, per: null, n: 1, raw, sets: 0, reps: 0 };
+    d.sets++; d.reps += reps;
+    if (per != null && (d.per == null || per > d.per)) { d.per = per; d.n = n; d.raw = raw; }
+    by.set(day, d);
+  }
+  return [...by.values()].sort((a, b) => a.day - b.day);
+}
+function weightChart(days) {
+  const pts = days.filter((d) => d.per != null); if (pts.length < 2) return '';
+  const W = 900, H = 200, L = 56, R = 12, T = 10, B = 24;
+  let x0 = pts[0].day, x1 = pts[pts.length - 1].day; if (x1 - x0 < 30) { x0 -= 15; x1 += 15; }
+  const hi = Math.max(...pts.map((d) => d.per)), ticks = niceTicks(0, hi * 1.1, 4), tmax = ticks[ticks.length - 1];
+  const X = (d) => L + (W - L - R) * (d - x0) / (x1 - x0), Y = (v) => T + (H - T - B) * (1 - v / tmax);
+  let s = `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px" role="img" aria-label="${t('wt.h')}">`;
+  ticks.forEach((v) => s += `<line class="axis" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${nf1.format(v)} kg</text>`);
+  const ya = yearOf(x0), yb = yearOf(x1);
+  for (let y = ya; y <= yb + 1; y++) { const d = Math.round(Date.UTC(y, 0, 1) / DAY); if (d < x0 || d > x1) continue; s += `<line class="axis" x1="${X(d)}" x2="${X(d)}" y1="${T}" y2="${H - B}" stroke-dasharray="2 3"/><text x="${X(d) + 3}" y="${H - 8}">${y}</text>`; }
+  if (ya === yb) s += `<text x="${L}" y="${H - 8}">${ya}</text>`;
+  s += `<path d="${pts.map((d, i) => (i ? 'L' : 'M') + X(d.day).toFixed(1) + ' ' + Y(d.per).toFixed(1)).join(' ')}" fill="none" style="stroke:var(--accent)" stroke-width="1.5" opacity=".6"/>`;
+  pts.forEach((d) => s += `<circle cx="${X(d.day).toFixed(1)}" cy="${Y(d.per).toFixed(1)}" r="4" style="fill:var(--accent)"><title>${fDate(d.day)}: ${fKg(d.per, d.n)}</title></circle>`);
+  return s + '</svg></div>';
+}
+function weightSection(ei) {
+  const days = weightDays(ei); if (!days.length) return '';
+  const parsed = days.filter((d) => d.per != null);
+  const label = (d) => fKg(d.per, d.n) || esc(d.raw);
+  let html = `<section class="panel sec"><div class="sechead"><h2>${t('wt.h')}</h2><span class="note">${t('wt.count', days.length)}</span></div>`;
+  if (parsed.length) {
+    const max = parsed.reduce((a, d) => (d.per > a.per ? d : a)), last = parsed[parsed.length - 1], first = parsed[0];
+    html += `<div class="stats">
+      ${stat(t('wt.max'), fKg(max.per, max.n), t('d.on', fDate(max.day)))}
+      ${stat(t('wt.last'), fKg(last.per, last.n), fDate(last.day))}
+      ${parsed.length > 1 ? stat(t('wt.change'), `${nf1.format(first.per)} → ${nf1.format(last.per)} kg`, t('wt.changeSub')) : ''}
+    </div>${weightChart(days)}`;
+  }
+  html += `<div class="scroll"><table><thead><tr><th>${t('th.date')}</th><th class="r">${t('wt.th')}</th><th class="r">${t('wt.sets')}</th><th class="r">${t('th.reps')}</th></tr></thead><tbody>
+    ${days.slice(-15).reverse().map((d) => `<tr><td>${fDate(d.day)}</td><td class="r">${label(d)}</td><td class="r">${d.sets}</td><td class="r">${d.reps ? nf.format(d.reps) : '–'}</td></tr>`).join('')}
+    </tbody></table></div><div class="note">${t('wt.note')}</div></section>`;
+  return html;
+}
+function weightOverview() {
+  if (!hasWeights()) return '';
+  const rows = Object.keys(M.exW).map(Number).map((ei) => ({ ei, days: weightDays(ei) })).filter((r) => r.days.length)
+    .sort((a, b) => b.days[b.days.length - 1].day - a.days[a.days.length - 1].day);
+  const item = (r) => {
+    const p = r.days.filter((d) => d.per != null), first = p[0], max = p.length ? p.reduce((a, d) => (d.per > a.per ? d : a)) : null, last = r.days[r.days.length - 1];
+    const right = !p.length ? '' : p.length > 1 && first.per !== max.per ? `<span class="ftl">${nf1.format(first.per)} <span class="arr">→</span> <b>${nf1.format(max.per)} kg</b></span><div class="meta">${t('wt.firstMax')}</div>` : `<span class="ftl"><b>${fKg(max.per, max.n)}</b></span>${p.length > 1 ? `<div class="meta">${t('wt.heaviest')}</div>` : ''}`;
+    return `<a class="row prow" href="#exercise-${r.ei}"><span class="dot" style="background:var(--accent)"></span><span><span class="nm">${esc(M.ex[r.ei])}</span><div class="meta">${t('wt.meta', r.days.length, fDate(last.day))}</div></span><span class="rt">${right}</span></a>`;
+  };
+  return `<details class="panel fold"><summary><span class="chev" aria-hidden="true"></span><h2>${t('wt.ovH')}</h2><span class="note">${t('wt.ovN', rows.length)}</span></summary><div class="foldbody"><div class="list">${rows.map(item).join('')}</div></div></details>`;
+}
+
 /* ---------- Routing ---------- */
-const NAV = ['overview', 'workouts', 'exercises', 'timeline'];
+const NAV = ['overview', 'progress', 'workouts', 'exercises', 'timeline'];
 function route() {
   const h = (location.hash || '#overview').slice(1);
   const view = $('view');
@@ -550,6 +702,7 @@ function route() {
   else if (h.startsWith('exercise-')) { tab = 'exercises'; view.innerHTML = exerciseDetail(+h.slice(9)); }
   else if (h === 'exercises') { tab = 'exercises'; view.innerHTML = exercisesView(); $('xsort').value = XS.sort; renderExList(); }
   else if (h === 'timeline') { tab = 'timeline'; view.innerHTML = timelineView(); }
+  else if (h === 'progress') { tab = 'progress'; view.innerHTML = progressView(); }
   else view.innerHTML = overview();
   NAV.forEach((n) => n === tab ? $('nav-' + n).setAttribute('aria-current', 'page') : $('nav-' + n).removeAttribute('aria-current'));
   window.scrollTo(0, 0);
@@ -561,6 +714,7 @@ function welcome() {
     <ol class="steps"><li>${t('wel.s1')}</li><li>${t('wel.s2')}</li><li>${t('wel.s3')}</li></ol></section>`;
 }
 addEventListener('hashchange', route);
+$('view').addEventListener('toggle', (e) => { if (e.target.hasAttribute && e.target.hasAttribute('data-pgdown')) { PG.showAllDown = e.target.open; return; } }, true);
 $('view').addEventListener('toggle', (e) => { const d = e.target; if (!d.dataset || !d.dataset.fold) return; TL.open[d.dataset.fold] = d.open; try { localStorage.setItem('ta-tl-open', JSON.stringify(TL.open)); } catch (err) {} }, true);
 
 $('view').addEventListener('click', (e) => {
@@ -571,6 +725,7 @@ $('view').addEventListener('click', (e) => {
   else if (t.dataset.cat !== undefined) { LS.cat = t.dataset.cat; document.querySelectorAll('#catChips .chip').forEach((b) => b.setAttribute('aria-pressed', b === t)); LS.limit = 150; renderList(); }
   else if (t.id === 'btnMore') { LS.limit += 150; renderList(); }
   else if (t.id === 'btnXMore') { XS.limit += 150; renderExList(); }
+  else if (t.dataset.pg) { if (t.dataset.pg === 'up') PG.showAllUp = !PG.showAllUp; else PG.showAllDown = !PG.showAllDown; const y = scrollY; $('view').innerHTML = progressView(); scrollTo(0, y); }
   else if (t.dataset.range) { TL.range = t.dataset.range; const y = scrollY; $('view').innerHTML = timelineView(); scrollTo(0, y); }
   else if (t.dataset.layer) { TL.layers[t.dataset.layer] = !TL.layers[t.dataset.layer]; const y = scrollY; $('view').innerHTML = timelineView(); scrollTo(0, y); }
 });
@@ -586,7 +741,7 @@ $('view').addEventListener('mouseleave', hideTip);
 addEventListener('scroll', hideTip, { passive: true });
 
 /* ---------- Laden, Sichern ---------- */
-const MODEL_V = 2;
+const MODEL_V = 4, MODEL_OK = [2, 3, 4];
 const PREVIEW = !!window.TA_PREVIEW;
 function setModel(m, src) {
   M = m; source = src; D = derive(m); D.ex = exInfo(m);
@@ -615,7 +770,7 @@ async function handleFile(f) {
     let raw; try { raw = JSON.parse(text); } catch (e) { throw Object.assign(new Error(t('err.json')), { known: true }); }
     let m, kind;
     if (raw && raw.app === 'trainingsarchiv' && raw.model) {
-      if (raw.model.v !== MODEL_V) throw Object.assign(new Error(t('err.backupVersion')), { known: true });
+      if (!MODEL_OK.includes(raw.model.v)) throw Object.assign(new Error(t('err.backupVersion')), { known: true });
       m = raw.model; kind = t('kind.backup');
     } else { m = processExport(raw); kind = t('kind.export'); }
     const saved = await DB.set('model', m);
@@ -680,7 +835,7 @@ if (!PREVIEW && 'serviceWorker' in navigator && /^https?:$/.test(location.protoc
 
 (async function init() {
   const stored = await DB.get('model');
-  if (stored && stored.v === MODEL_V) { setModel(stored, 'upload'); return; }
+  if (stored && MODEL_OK.includes(stored.v)) { setModel(stored, 'upload'); return; }
   const s = seed();
   if (s) setModel(s, 'seed');
   else { updateSrcLabel(); toggleUpload(true); route(); }

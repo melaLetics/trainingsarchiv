@@ -23,6 +23,7 @@ Service Worker und „App installieren“ funktionieren nur über `localhost` od
 - **Überblick**: Gesamtzahlen, Serien, Kalender aller Trainingstage, Trainings pro Jahr, „Vor genau einem Jahr“, Top-Workouts und -Übungen, Wochentag und Uhrzeit
 - **Workouts**: alle Workouts mit Suche und Filtern, Detail mit Aufbau, Bestwert-Verlauf, Rundenzeiten und letzten Durchführungen
 - **Übungen**: Summen pro Übung, Verlauf pro Jahr, Workouts, in denen die Übung vorkommt
+- **Gewichte**: Enthält der Export Übungen mit Gewicht, zeigt die Übungsansicht schwerstes und letztes Gewicht mit Verlauf, und unter „Fortschritt“ erscheint eine Liste dieser Übungen. Ohne Gewichtsangaben im Export bleiben beide Abschnitte ausgeblendet.
 - **Verlauf**: Trainingsstunden pro Monat, dazu Körpergewicht, gekochte Mahlzeiten und Kilometer auf derselben Zeitachse
 
 Die Oberfläche gibt es auf Deutsch und Englisch (Schaltfläche DE/EN oben). Beim ersten Start richtet sich die Sprache nach dem Browser, danach wird die Wahl gespeichert.

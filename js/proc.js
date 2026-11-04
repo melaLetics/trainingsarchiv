@@ -34,6 +34,15 @@
     for (const v of arr) { const k = c.get(v) + 1 || 1; c.set(v, k); if (k > bn) { bn = k; best = v; } }
     return best;
   }
+  // Gewichtsangabe aus dem Export, z. B. "8 kg", "1,5 kg", "2 x 1,5 kg", "20 lbs" -> [kg je Gerät, Anzahl]
+  function parseWeight(w) {
+    if (w == null) return null;
+    const s = String(w).trim().toLowerCase().replace(/,/g, '.');
+    const m = /^(?:(\d+)\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(kg|kgs|lb|lbs)?$/.exec(s);
+    if (!m) return null;
+    let per = parseFloat(m[2]); if (m[3] && m[3].startsWith('lb')) per = Math.round(per * 0.45359 * 100) / 100;
+    return [per, m[1] ? parseInt(m[1], 10) : 1];
+  }
   function roundsOf(x) {
     return (x.rounds || []).slice().sort((a, b) => (a.round || 0) - (b.round || 0));
   }
@@ -80,8 +89,11 @@
       workouts.push(w);
     }
 
-    const S = { w: [], day: [], hour: [], dur: [], pts: [], reps: [], dist: [], f: [], rt: [] };
+    const S = { w: [], day: [], hour: [], dur: [], pts: [], reps: [], dist: [], f: [], rt: [], tf: [], x1: [] };
+    const TF = { bad: 1, medium: 2, good: 3, 'very-good': 4 };
+    const pendingName = [];
     const exTot = exNames.map(() => [0, 0, 0]);
+    const exW = {};
     const sorted = T.slice().sort((a, b) => (a.performed_at < b.performed_at ? -1 : 1));
     for (const x of sorted) {
       const lp = localParts(x.performed_at, x.time_zone);
@@ -91,13 +103,33 @@
       S.w.push(wIdx.get(x.workout)); S.day.push(lp.day); S.hour.push(lp.hour);
       S.dur.push(dur); S.pts.push(x.points || 0); S.reps.push(x.repetitions || 0); S.dist.push(x.distance || 0);
       S.f.push((x.star ? 1 : 0) | (x.personal_best ? 2 : 0));
+      S.tf.push(TF[x.technique_feedback] || 0);
+      // Einzelübung: alle Übungen (ohne Pause) gleich, sonst später über den Workout-Namen
+      const one = new Set();
+      for (const r of rs) for (const e of r.exercises || []) if (e.exercise !== 'Pause') one.add(e.exercise);
+      if (one.size === 1) S.x1.push(ex([...one][0]));
+      else { S.x1.push(-1); if (!one.size) pendingName.push(S.x1.length - 1); }
       S.rt.push(rs.length > 1 ? rs.map((r) => r.time_in_seconds || 0) : 0);
       for (const r of rs) for (const e of r.exercises || []) {
         const t = exTot[ex(e.exercise)] || (exTot[ex(e.exercise)] = [0, 0, 0]);
         t[0] += e.repetitions || 0; t[1] += e.time_in_seconds || 0; t[2] += 1;
+        if (e.weight != null && e.weight !== '') {
+          // exW[übung] = [[tag, kg je Gerät oder null, Anzahl Geräte, Wiederholungen, Originaltext], ...]
+          const pw = parseWeight(e.weight), k = ex(e.exercise);
+          (exW[k] = exW[k] || []).push([lp.day, pw ? pw[0] : null, pw ? pw[1] : 1, e.repetitions || 0, String(e.weight)]);
+        }
       }
     }
     while (exTot.length < exNames.length) exTot.push([0, 0, 0]);
+
+    // Trainings ohne Rundendaten: Workout-Name „<Übung> <Variante> <Zahl>“ einer bekannten Übung zuordnen
+    const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const exByNorm = new Map(); exNames.forEach((n, i) => { if (n !== 'Pause') exByNorm.set(norm(n), i); });
+    const nameRe = /^(.*?)\s+(standard|technical|strength|endurance|none|fast)\s+\d+$/i;
+    for (const k of pendingName) {
+      const m = nameRe.exec(workouts[S.w[k]].n); if (!m) continue;
+      const hit = exByNorm.get(norm(m[1])); if (hit !== undefined) S.x1[k] = hit;
+    }
 
     // Übungen pro Jahr: exY[ex] = { jahr: [wdh, sekunden, vorkommen] }
     const exY = exNames.map(() => ({}));
@@ -127,7 +159,7 @@
     (cm.coach_buckets || []).forEach((m) => addMeal(m, 0));
     (cm.free_buckets || []).forEach((m) => addMeal(m, 1));
 
-    return { v: 2, created: new Date().toISOString().slice(0, 10), w: workouts, ex: exNames, exTot, exY, body, meals, s: S };
+    return { v: 4, created: new Date().toISOString().slice(0, 10), w: workouts, ex: exNames, exTot, exY, exW, body, meals, s: S };
   }
 
   root.processExport = processExport;
