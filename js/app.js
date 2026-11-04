@@ -143,12 +143,58 @@ function overview() {
       <div class="panel sec"><h2>${t('ov.onThisDay')}</h2>${onThisDay()}</div>
     </section>`;
   html += `<section class="grid2">
+      <div class="panel sec"><div class="sechead"><h2>${t('era.h')}</h2></div><div class="note">${t('era.sub')}</div>${erasView()}</div>
+      <div class="panel sec"><h2>${t('crazy.h')}</h2>${crazyDay()}</div>
+    </section>`;
+  html += `<section class="grid2">
       <div class="panel sec"><h2>${t('ov.topW')}</h2><div class="list">${topWorkouts()}</div></div>
       <div class="panel sec"><h2>${t('ov.topX')}</h2>${topExercises()}<div class="note">${t('ov.topXNote', D.ex.minY)} <a href="#exercises">${t('ov.allX')}</a></div></div>
     </section>`;
   html += `<section class="panel sec" id="pbwhen">${pbWhen()}</section>`;
   html += `<section class="grid2"><div class="panel sec"><h2>${t('ov.weekdays')}</h2>${rhythm('wd')}</div><div class="panel sec"><h2>${t('ov.hourOfDay')}</h2>${rhythm('hour')}</div></section>`;
   return html;
+}
+
+/* Meine Ären: häufigstes Workout pro Jahr, gleiche Favoriten in Folge zusammengefasst */
+function erasView() {
+  const S = M.s, by = new Map(), seen = new Set(), fresh = {};
+  for (let i = 0; i < S.w.length; i++) {
+    const y = yearOf(S.day[i]); if (!by.has(y)) by.set(y, new Map());
+    const m = by.get(y); m.set(S.w[i], (m.get(S.w[i]) || 0) + 1);
+    if (!seen.has(S.w[i])) { seen.add(S.w[i]); fresh[y] = (fresh[y] || 0) + 1; }
+  }
+  const years = [...by.keys()].sort((a, b) => a - b).map((y) => {
+    const m = by.get(y), sorted = [...m.entries()].sort((a, b) => b[1] - a[1]);
+    const alt = M.w[sorted[0][0]].c === 'mob' ? sorted.find(([wi]) => M.w[wi].c !== 'mob') : null;
+    return { y, wi: sorted[0][0], n: sorted[0][1], total: [...m.values()].reduce((a, b) => a + b, 0), fresh: fresh[y] || 0, alt };
+  });
+  const eras = [];
+  years.forEach((r) => { const last = eras[eras.length - 1]; if (last && last.wi === r.wi && last.y1 === r.y - 1) { last.y1 = r.y; last.n += r.n; last.years.push(r); } else eras.push({ wi: r.wi, y0: r.y, y1: r.y, n: r.n, years: [r] }); });
+  return `<div class="eras">${eras.map((e) => { const w = M.w[e.wi], altR = e.years[e.years.length - 1].alt;
+    return `<div class="era"><div class="eyr num">${e.y0}${e.y1 > e.y0 ? '–' + String(e.y1).slice(2) : ''}</div><div class="ebody"><a class="enm" href="#workout-${e.wi}"><span class="sw c-${w.c}"></span>${esc(w.n)}</a><div class="meta">${t('era.times', nf.format(e.n))}${altR ? ' · ' + t('era.also', `<a href="#workout-${altR[0]}">${esc(M.w[altR[0]].n)}</a>`) : ''}</div><div class="meta">${e.years.map((r) => t('era.yearMeta', r.y, nf.format(r.total), nf.format(r.fresh))).join('<br>')}</div></div></div>`; }).join('')}</div>`;
+}
+/* Der verrückteste Tag: die meisten Einheiten an einem Tag */
+function crazyDay() {
+  const S = M.s; let best = null, longest = null, mostReps = null;
+  for (const [day, ss] of D.dayMap) {
+    const secs = ss.reduce((a, i) => a + (S.dur[i] <= 36000 ? S.dur[i] : 0), 0), reps = ss.reduce((a, i) => a + S.reps[i], 0);
+    const o = { day, ss, secs, reps };
+    if (!best || ss.length > best.ss.length || (ss.length === best.ss.length && secs > best.secs)) best = o;
+    if (!longest || secs > longest.secs) longest = o;
+    if (!mostReps || reps > mostReps.reps) mostReps = o;
+  }
+  const wdName = (d) => WD_NAME[(dDate(d).getUTCDay() + 6) % 7];
+  const groups = new Map(); best.ss.forEach((i) => groups.set(S.w[i], (groups.get(S.w[i]) || 0) + 1));
+  const list = [...groups.entries()].sort((a, b) => b[1] - a[1]);
+  let h = `<div class="crazy"><div class="cbig num">${nf.format(best.ss.length)}</div><div><div class="clead">${t('crazy.lead')}</div><div class="meta">${wdName(best.day)}, ${fDate(best.day)} · ${fHours(best.secs)}${best.reps ? ' · ' + t('d.totalReps', nf.format(best.reps)) : ''}</div></div></div>
+    <div class="list">${list.map(([wi, n]) => `<a class="row" href="#workout-${wi}"><span class="dot c-${M.w[wi].c}"></span><span class="nm">${esc(M.w[wi].n)}</span><span class="rt"><b>${n}</b>×</span></a>`).join('')}</div>`;
+  const extra = [];
+  if (longest.day !== best.day) extra.push(`${t('crazy.longest')}: <b>${fHours(longest.secs)}</b> ${t('d.on', fDate(longest.day))}`);
+  const skipped = S.dur.some((x) => x > 36000);
+  if (mostReps.reps && mostReps.day !== best.day) extra.push(`${t('crazy.mostReps')}: <b>${nf.format(mostReps.reps)}</b> ${t('d.on', fDate(mostReps.day))}`);
+  if (extra.length) h += `<div class="crazyfacts">${extra.map((x) => `<div>${x}</div>`).join('')}</div>`;
+  if (skipped) h += `<div class="note">${t('crazy.skip')}</div>`;
+  return h;
 }
 const unit = (s) => s.replace(/ (km|h)$/, '<small>$1</small>');
 function stat(l, v, s) { return `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`; }

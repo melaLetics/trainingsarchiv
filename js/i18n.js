@@ -158,6 +158,17 @@
     'wel.s3': 'Fertig. Beim nächsten Öffnen sind die Daten sofort da.',
 
 
+    // Ären, verrücktester Tag
+    'era.h': 'Meine Ären',
+    'era.sub': 'Dein häufigstes Workout pro Jahr. Folgen mehrere Jahre mit demselben Favoriten aufeinander, sind sie zusammengefasst.',
+    'era.times': (n) => `${n}× in dieser Zeit`,
+    'era.also': (a) => `sonst am häufigsten: ${a}`,
+    'era.yearMeta': (y, n, nw) => `${y}: ${n} Trainings, davon ${nw} Workouts zum ersten Mal`,
+    'crazy.h': 'Dein verrücktester Tag',
+    'crazy.lead': 'Einheiten an einem einzigen Tag',
+    'crazy.longest': 'Längster Trainingstag',
+    'crazy.mostReps': 'Meiste Wiederholungen an einem Tag',
+    'crazy.skip': 'Einheiten mit mehr als 10 Stunden zählen hier nicht mit, dort lief vermutlich die Stoppuhr weiter.',
     // Fortschritt
     'nav.progress': 'Fortschritt',
     'pg.h1': 'Fortschritt',
@@ -370,6 +381,16 @@
     'wel.s3': 'Done. Next time you open the app, your data is there right away.',
 
 
+    'era.h': 'My eras',
+    'era.sub': 'Your most frequent workout each year. Consecutive years with the same favourite are grouped together.',
+    'era.times': (n) => `${n}× in this period`,
+    'era.also': (a) => `otherwise most often: ${a}`,
+    'era.yearMeta': (y, n, nw) => `${y}: ${n} workouts, ${nw} of them done for the first time`,
+    'crazy.h': 'Your craziest day',
+    'crazy.lead': 'sessions in a single day',
+    'crazy.longest': 'Longest training day',
+    'crazy.mostReps': 'Most reps in one day',
+    'crazy.skip': 'Sessions longer than 10 hours are left out here; the timer was probably left running.',
     'nav.progress': 'Progress',
     'pg.h1': 'Progress',
     'pg.sub': 'Where you have improved: workouts you did at least ten times, your personal bests and your technique feedback.',

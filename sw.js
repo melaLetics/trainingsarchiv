@@ -1,6 +1,6 @@
 /* Service Worker: hält die App offline verfügbar.
    Bei Änderungen an App-Dateien VERSION erhöhen, damit Geräte die neue Fassung laden. */
-const VERSION = 'ta-v14';
+const VERSION = 'ta-v15';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/i18n.js', 'js/proc.js', 'js/unzip.js', 'js/app.js',

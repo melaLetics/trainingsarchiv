@@ -182,3 +182,26 @@ a { color: var(--accent); }
 .howto { font-size: 13px; color: var(--muted); }
 .howto summary { cursor: pointer; font-weight: 600; }
 .howto p { margin: 6px 0 0; max-width: 75ch; }
+
+/* Meine Ären */
+.eras { display: grid; gap: 0; }
+.era { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; position: relative; padding-bottom: 14px; }
+.era::before { content: ""; position: absolute; left: 70px; top: 10px; bottom: 0; width: 2px; background: var(--line); }
+.era:last-child::before { display: none; }
+.eyr { font-size: 17px; font-weight: 700; color: var(--muted); padding-top: 1px; }
+.ebody { padding-left: 16px; position: relative; min-width: 0; }
+.ebody::before { content: ""; position: absolute; left: -7px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+.enm { font-weight: 700; color: var(--fg); text-decoration: none; overflow-wrap: anywhere; }
+.enm:hover { color: var(--accent); }
+.enm .sw { margin-right: 6px; }
+.ebody .meta { font-size: 13px; color: var(--muted); }
+/* Verrücktester Tag */
+.crazy { display: flex; align-items: center; gap: 14px; }
+.cbig { font-family: var(--display); font-size: 64px; font-weight: 700; line-height: .9; color: var(--accent); }
+.clead { font-family: var(--display); font-size: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.grid2 > .panel.sec { align-content: start; }
+.eyr { white-space: nowrap; }
+.era { grid-template-columns: 72px minmax(0, 1fr); }
+.era::before { left: 78px; }
+.crazyfacts { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.crazyfacts b { color: var(--fg); }
